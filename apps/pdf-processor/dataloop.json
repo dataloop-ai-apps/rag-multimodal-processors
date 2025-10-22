@@ -1,0 +1,288 @@
+{
+  "displayName": "PDF to Chunks",
+  "name": "pdf_to_chunks",
+  "scope": "public",
+  "version": "0.1.0",
+  "description": "PDF processing service that extracts text, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
+  "attributes": {
+    "Category": "Application",
+    "Provider": "Dataloop",
+    "Deployed By": "Dataloop",
+    "License": "Apache 2.0",
+    "Application Type": [
+      "Pipeline Node"
+    ],
+    "Media Type": [
+      "Document"
+    ]
+  },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.0"
+  },
+  "components": {
+    "computeConfigs": [
+      {
+        "name": "pdf-processor-service",
+        "runtime": {
+          "podType": "regular-m",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pdf-processor:0.0.1",
+          "concurrency": 25,
+          "autoscaler": {
+            "minReplicas": 0,
+            "maxReplicas": 10,
+            "queueLength": 100
+          }
+        }
+      }
+    ],
+    "pipelineNodes": [
+      {
+        "invoke": {
+          "type": "function",
+          "namespace": "pdf-processor-service.pdf-processor-module.process_document"
+        },
+        "name": "process_document",
+        "categories": [
+          "text-utils",
+          "document-processing"
+        ],
+        "displayName": "PDF to Chunks",
+        "description": "Process PDF documents to extract text, apply OCR, and create chunks",
+        "scope": "project",
+        "configuration": {
+          "fields": [
+            {
+              "name": "name",
+              "title": "Node Name",
+              "props": {
+                "title": true,
+                "type": "string",
+                "default": "PDF-to-Chunks",
+                "required": true,
+                "placeholder": "Insert node name"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-input"
+            },
+            {
+              "name": "ocr_from_images",
+              "title": "Extract Text from Images (OCR)",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "description": "Extract images from PDF and apply OCR to extract text from them"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "custom_ocr_model_id",
+              "title": "Custom OCR Model ID (Optional)",
+              "props": {
+                "type": "string",
+                "title": true,
+                "required": false,
+                "placeholder": "Leave empty to use EasyOCR (default)",
+                "description": "Provide a deployed Dataloop OCR model ID for custom OCR. Otherwise, EasyOCR will be used."
+              },
+              "widget": "dl-input"
+            },
+            {
+              "name": "ocr_integration_method",
+              "title": "OCR Integration Method",
+              "props": {
+                "type": "string",
+                "required": true,
+                "default": "append_to_page",
+                "options": [
+                  {
+                    "value": "append_to_page",
+                    "label": "Append to Page Text"
+                  },
+                  {
+                    "value": "separate_chunks",
+                    "label": "Create Separate Chunks"
+                  },
+                  {
+                    "value": "combine_all",
+                    "label": "Combine All Text"
+                  }
+                ]
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-select"
+            },
+            {
+              "name": "use_markdown_extraction",
+              "title": "Use Markdown Extraction",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "description": "Extract PDF as Markdown for better structure preservation"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "chunking_strategy",
+              "title": "Chunking Strategy",
+              "props": {
+                "type": "string",
+                "required": true,
+                "default": "recursive",
+                "options": [
+                  {
+                    "value": "fixed-size",
+                    "label": "Fixed Size"
+                  },
+                  {
+                    "value": "recursive",
+                    "label": "Recursive"
+                  },
+                  {
+                    "value": "nltk-sentence",
+                    "label": "NLTK Sentence"
+                  },
+                  {
+                    "value": "nltk-paragraphs",
+                    "label": "NLTK Paragraphs"
+                  },
+                  {
+                    "value": "1-chunk",
+                    "label": "Single Chunk"
+                  }
+                ]
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-select"
+            },
+            {
+              "name": "max_chunk_size",
+              "title": "Max Chunk Size",
+              "props": {
+                "type": "number",
+                "default": 300,
+                "min": 1,
+                "max": 2000,
+                "step": 1,
+                "title": true,
+                "required": true
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider"
+            },
+            {
+              "name": "chunk_overlap",
+              "title": "Chunk Overlap",
+              "props": {
+                "type": "number",
+                "default": 20,
+                "min": 0,
+                "max": 500,
+                "step": 1,
+                "title": true,
+                "required": true
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider"
+            },
+            {
+              "name": "to_correct_spelling",
+              "title": "Apply Text Cleaning",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "remote_path_for_chunks",
+              "title": "Remote Path for Chunks",
+              "props": {
+                "type": "string",
+                "default": "/chunks",
+                "title": true,
+                "required": true
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-input"
+            },
+            {
+              "name": "target_dataset",
+              "title": "Target Dataset (Optional)",
+              "props": {
+                "type": "string",
+                "title": true,
+                "required": false,
+                "placeholder": "Leave empty to auto-create {dataset_name}_chunks"
+              },
+              "widget": "dl-input"
+            }
+          ]
+        }
+      }
+    ],
+    "modules": [
+      {
+        "name": "pdf-processor-module",
+        "computeConfig": "pdf-processor-service",
+        "entryPoint": "pdf_processor.py",
+        "className": "PDFProcessor",
+        "initInputs": [],
+        "functions": [
+          {
+            "name": "process_document",
+            "input": [
+              {
+                "type": "Item",
+                "name": "item"
+              }
+            ],
+            "output": [
+              {
+                "type": "Item[]",
+                "name": "items"
+              }
+            ],
+            "displayIcon": "icon-dl-pdf",
+            "displayName": "PDF to Chunks"
+          }
+        ]
+      }
+    ]
+  }
+}
+
