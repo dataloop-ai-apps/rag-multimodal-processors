@@ -223,8 +223,19 @@
               "widget": "dl-checkbox"
             },
             {
+              "name": "target_dataset",
+              "title": "Target Dataset ID (Optional)",
+              "props": {
+                "type": "string",
+                "title": true,
+                "required": false,
+                "placeholder": "Leave empty to auto-create {dataset_name}_chunks dataset"
+              },
+              "widget": "dl-input"
+            },
+            {
               "name": "remote_path_for_chunks",
-              "title": "Remote Path for Chunks",
+              "title": "Remote Directory Path for Chunks",
               "props": {
                 "type": "string",
                 "default": "/chunks",
@@ -237,17 +248,6 @@
                   "effect": "error"
                 }
               ],
-              "widget": "dl-input"
-            },
-            {
-              "name": "target_dataset",
-              "title": "Target Dataset (Optional)",
-              "props": {
-                "type": "string",
-                "title": true,
-                "required": false,
-                "placeholder": "Leave empty to auto-create {dataset_name}_chunks"
-              },
               "widget": "dl-input"
             }
           ]
