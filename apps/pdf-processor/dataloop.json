@@ -2,7 +2,7 @@
   "displayName": "PDF to Chunks",
   "name": "pdf_to_chunks",
   "scope": "public",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "PDF processing service that extracts text, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
@@ -45,7 +45,6 @@
         },
         "name": "process_document",
         "categories": [
-          "text-utils",
           "document-processing"
         ],
         "displayName": "PDF to Chunks",
@@ -181,7 +180,7 @@
                 "default": 300,
                 "min": 1,
                 "max": 2000,
-                "step": 1,
+                "step": 50,
                 "title": true,
                 "required": true
               },
@@ -198,10 +197,10 @@
               "title": "Chunk Overlap",
               "props": {
                 "type": "number",
-                "default": 20,
+                "default": 50,
                 "min": 0,
-                "max": 500,
-                "step": 1,
+                "max": 400,
+                "step": 10,
                 "title": true,
                 "required": true
               },
@@ -259,7 +258,7 @@
       {
         "name": "pdf-processor-module",
         "computeConfig": "pdf-processor-service",
-        "entryPoint": "pdf_processor.py",
+        "entryPoint": "apps/pdf-processor/pdf_processor.py",
         "className": "PDFProcessor",
         "initInputs": [],
         "functions": [

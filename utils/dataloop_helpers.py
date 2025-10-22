@@ -129,21 +129,21 @@ def upload_chunks(chunks: List[str],
         )
         raise dl.PlatformException(f"No chunks were uploaded! Total chunks: {len(binaries)}")
     elif isinstance(uploaded_items, dl.Item):
-        chunk_items = [uploaded_items]
+        uploaded_items = [uploaded_items]
     else:
-        chunk_items = [item for item in uploaded_items]
+        uploaded_items = [item for item in uploaded_items]
     
     try:
-        uploaded_names = [it.name for it in chunk_items]
+        uploaded_names = [it.name for it in uploaded_items]
     except Exception:
         uploaded_names = ["<unknown>"]
-    
+
     logger.info(
-        f"Upload completed | item_id={original_item.id} uploaded_count={len(chunk_items)} "
+        f"Upload completed | item_id={original_item.id} uploaded_count={len(uploaded_items)} "
         f"remote_path={full_remote_path} sample_names={uploaded_names[:3]}"
     )
     
-    return chunk_items
+    return uploaded_items
 
 
 def create_chunk_metadata(original_item: dl.Item,
