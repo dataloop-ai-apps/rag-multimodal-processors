@@ -114,7 +114,7 @@ class PDFProcessor(dl.BaseServiceRunner):
         processor_metadata['chunking_strategy'] = chunking_strategy
         
         # Upload chunks
-        chunk_items = upload_chunks(
+        chunked_items = upload_chunks(
             chunks=chunks,
             original_item=item,
             target_dataset=target_ds,
@@ -123,9 +123,9 @@ class PDFProcessor(dl.BaseServiceRunner):
         )
         
         logger.info(
-            f"Processing completed | chunks={len(chunk_items)} dataset={target_ds.name}"
+            f"Processing completed | chunks={len(chunked_items)} dataset={target_ds.name}"
         )
-        return chunk_items
+        return chunked_items
 
     def _extract_content(self, item: dl.Item, ocr_from_images: bool,
                         custom_ocr_model_id: str, ocr_integration_method: str,
