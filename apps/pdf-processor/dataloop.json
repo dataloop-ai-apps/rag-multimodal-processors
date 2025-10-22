@@ -77,7 +77,8 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "description": "Extract images from PDF and apply OCR to extract text from them"
+                "description": "Extract images from PDF and apply OCR to extract text from them",
+                "tooltip": "Extract images from PDF and apply OCR to extract text from them"
               },
               "widget": "dl-checkbox"
             },
