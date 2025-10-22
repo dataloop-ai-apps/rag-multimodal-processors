@@ -411,19 +411,19 @@ class PDFProcessor(dl.BaseServiceRunner):
             for ocr_result in ocr_texts:
                 page_idx = ocr_result['page_index']
                 if page_idx < len(combined_pages):
-                    combined_pages[page_idx] += f"\n\n[OCR_IMAGE_{ocr_result['image_index']}]\n{ocr_result['text']}"
+                    combined_pages[page_idx] += f"\n\n[OCR_IMAGE_{ocr_result['image_index']}]\n{ocr_result['text']}" if ocr_result['text'] else ''
             return '\n\n'.join(combined_pages)
             
         elif integration_method == 'separate_chunks':
             pdf_text = '\n\n'.join(page_texts)
-            ocr_text = '\n\n'.join([f"[OCR_PAGE_{r['page_index']}_IMAGE_{r['image_index']}]\n{r['text']}" 
+            ocr_text = '\n\n'.join([f"[OCR_PAGE_{r['page_index']}_IMAGE_{r['image_index']}]\n{r['text']}" if r['text'] else ''
                                    for r in ocr_texts])
             return f"{pdf_text}\n\n[OCR_SECTION]\n{ocr_text}"
             
         else:  # combine_all
             all_text = '\n\n'.join(page_texts)
             for ocr_result in ocr_texts:
-                all_text += f"\n\n[OCR_PAGE_{ocr_result['page_index']}_IMAGE_{ocr_result['image_index']}]\n{ocr_result['text']}"
+                all_text += f"\n\n[OCR_PAGE_{ocr_result['page_index']}_IMAGE_{ocr_result['image_index']}]\n{ocr_result['text']}" if ocr_result['text'] else ''
             return all_text
 
     def _get_metadata(self, item: dl.Item, config: Dict[str, Any]) -> Dict[str, Any]:
