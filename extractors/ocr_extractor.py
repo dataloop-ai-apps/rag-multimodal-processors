@@ -17,6 +17,9 @@ class OCRExtractor(DataloopModelExecutor):
     Defaults to EasyOCR, supports custom Dataloop models via custom_ocr_model_id.
     """
     
+    _easyocr_reader = None
+    _easyocr_languages = ['en', 'es', 'fr', 'de', 'it', 'pt']
+    
     def extract_text(self, image_path: str) -> str:
         """
         Extract text from image file using EasyOCR.
@@ -86,7 +89,7 @@ class OCRExtractor(DataloopModelExecutor):
     
     def _external_ocr(self, image_path: str) -> str:
         """
-        External OCR implementation using EasyOCR.
+        External OCR implementation using EasyOCR with model caching.
         
         Args:
             image_path (str): Path to image file
@@ -94,16 +97,20 @@ class OCRExtractor(DataloopModelExecutor):
         Returns:
             str: Extracted text
         """
-        languages = ['en', 'es', 'fr', 'de', 'it', 'pt']
-        
         try:
             import easyocr
-            logger.info(f"Initializing EasyOCR with languages: {languages}")
-            easyocr_reader = easyocr.Reader(languages, gpu=False)
             
-            # Perform OCR directly on image path (most efficient)
+            # Initialize EasyOCR reader only once (class-level caching)
+            if OCRExtractor._easyocr_reader is None:
+                logger.info(f"Initializing EasyOCR reader with languages: {OCRExtractor._easyocr_languages}")
+                OCRExtractor._easyocr_reader = easyocr.Reader(OCRExtractor._easyocr_languages, gpu=False)
+                logger.info("EasyOCR reader initialized and cached")
+            else:
+                logger.debug("Using cached EasyOCR reader")
+            
+            # Perform OCR directly on image path
             logger.debug(f"Running EasyOCR on image: {image_path}")
-            results = easyocr_reader.readtext(image_path)
+            results = OCRExtractor._easyocr_reader.readtext(image_path)
             
             # Extract text from results (bbox, text, confidence)
             all_text = ' '.join([text for (bbox, text, confidence) in results])

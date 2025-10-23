@@ -7,9 +7,9 @@ import dtlpy as dl
 import logging
 import io
 import os
-import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from .chunk_metadata import ChunkMetadata
 
 logger = logging.getLogger('item-processor-logger')
 
@@ -104,11 +104,11 @@ def upload_chunks(chunks: List[str],
         buffer.seek(0)
         binaries.append(buffer)
     
-    # Create metadata
-    base_metadata = create_chunk_metadata(
+    # Create metadata using shared ChunkMetadata class
+    base_metadata = ChunkMetadata.create(
         original_item=original_item,
         total_chunks=len(chunks),
-        processor_metadata=processor_metadata
+        processor_specific_metadata=processor_metadata
     )
     
     full_remote_path = os.path.join(remote_path, original_item.dir.lstrip('/')).replace('\\', '/')
@@ -146,44 +146,11 @@ def upload_chunks(chunks: List[str],
     return uploaded_items
 
 
-def create_chunk_metadata(original_item: dl.Item,
-                         total_chunks: int,
-                         processor_metadata: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Create standardized metadata for chunk items.
-    
-    Args:
-        original_item (dl.Item): Original document item
-        total_chunks (int): Total number of chunks
-        processor_metadata (Dict[str, Any]): Processor-specific metadata
-        
-    Returns:
-        Dict[str, Any]: Standardized metadata structure
-    """
-    metadata = {
-        'user': {
-            'document': original_item.name,
-            'document_type': original_item.mimetype,
-            'total_chunks': total_chunks,
-            'extracted_chunk': True,
-            'original_item_id': original_item.id,
-            'original_dataset_id': original_item.dataset.id,
-            'processing_timestamp': time.time()
-        }
-    }
-    
-    # Merge processor-specific metadata
-    metadata['user'].update(processor_metadata)
-    
-    return metadata
-
-
 def cleanup_temp_items_and_folder(
     items: List[dl.Item],
     folder_path: str,
     dataset: dl.Dataset,
-    local_temp_dir: Optional[str] = None
-) -> None:
+    local_temp_dir: Optional[str] = None) -> None:
     """
     Clean up temporary items, folder, and local directory.
     

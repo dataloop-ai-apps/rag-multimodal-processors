@@ -77,22 +77,9 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "description": "Extract images from PDF and apply OCR to extract text from them",
-                "tooltip": "Extract images from PDF and apply OCR to extract text from them"
+                "description": "Extract images from PDF and apply OCR to extract text from them"
               },
               "widget": "dl-checkbox"
-            },
-            {
-              "name": "custom_ocr_model_id",
-              "title": "Custom OCR Model ID (Optional)",
-              "props": {
-                "type": "string",
-                "title": true,
-                "required": false,
-                "placeholder": "Leave empty to use EasyOCR (default)",
-                "description": "Provide a deployed Dataloop OCR model ID for custom OCR. Otherwise, EasyOCR will be used."
-              },
-              "widget": "dl-input"
             },
             {
               "name": "ocr_integration_method",
@@ -219,37 +206,10 @@
               "props": {
                 "type": "boolean",
                 "title": true,
-                "default": false
+                "default": false,
+                "description": "Apply text cleaning and normalization to fix OCR errors and inconsistent formatting"
               },
               "widget": "dl-checkbox"
-            },
-            {
-              "name": "target_dataset",
-              "title": "Target Dataset ID (Optional)",
-              "props": {
-                "type": "string",
-                "title": true,
-                "required": false,
-                "placeholder": "Leave empty to auto-create {dataset_name}_chunks dataset"
-              },
-              "widget": "dl-input"
-            },
-            {
-              "name": "remote_path_for_chunks",
-              "title": "Remote Directory Path for Chunks",
-              "props": {
-                "type": "string",
-                "default": "/chunks",
-                "title": true,
-                "required": true
-              },
-              "rules": [
-                {
-                  "type": "required",
-                  "effect": "error"
-                }
-              ],
-              "widget": "dl-input"
             }
           ]
         }
@@ -269,6 +229,10 @@
               {
                 "type": "Item",
                 "name": "item"
+              },
+              {
+                "type": "Dataset",
+                "name": "target_dataset"
               }
             ],
             "output": [

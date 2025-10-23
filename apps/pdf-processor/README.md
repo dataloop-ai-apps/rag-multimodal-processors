@@ -11,16 +11,10 @@ A Dataloop application that extracts text from PDF documents, applies OCR to ima
 ### OCR from Images
 Extract embedded images and apply OCR to extract text:
 
-**EasyOCR (Default)**
 - ✅ Local processing, no upload required
 - ✅ Processes images as temporary files
 - ✅ No Dataloop items created
-
-**Custom Dataloop Models**
-- ✅ Use any deployed Dataloop OCR model
-- ✅ Batch processing for efficiency
-- ✅ Automatic cleanup of temporary items
-- ✅ Flow: Extract → Upload → Predict → Cleanup
+- ✅ Fast and efficient text extraction
 
 **OCR Integration Methods**
 - `append_to_page`: Attaches OCR text to corresponding page (maintains structure)
@@ -48,37 +42,29 @@ All parameters are configured via the pipeline node in Dataloop.
 
 ### Core Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `ocr_from_images` | boolean | `false` | Extract images from PDF and apply OCR |
-| `custom_ocr_model_id` | string | `null` | Deployed Dataloop OCR model ID (optional, uses EasyOCR if not provided) |
-| `ocr_integration_method` | string | `"append_to_page"` | How to integrate OCR text |
-| `use_markdown_extraction` | boolean | `false` | Preserve document structure using markdown |
-| `chunking_strategy` | string | `"recursive"` | Text chunking strategy |
-| `max_chunk_size` | integer | `300` | Maximum chunk size in characters |
-| `chunk_overlap` | integer | `20` | Overlap between chunks in characters |
-| `to_correct_spelling` | boolean | `false` | Apply text cleaning and normalization |
-| `remote_path_for_chunks` | string | `"/chunks"` | Remote path for storing chunks |
-| `target_dataset` | string | `null` | Target dataset ID (auto-creates if not specified) |
+| Parameter | Type | Default | Valid Values/Range | Description |
+|-----------|------|---------|-------------------|-------------|
+| `ocr_from_images` | boolean | `false` | `true` or `false` | When enabled, extracts all embedded images from the PDF document and applies OCR (Optical Character Recognition) to extract text from them. The extracted text is then integrated with the main document text according to the `ocr_integration_method`. |
+| `ocr_integration_method` | string | `"append_to_page"` | `"append_to_page"`, `"separate_chunks"`, or `"combine_all"` | Controls how OCR-extracted text from images is integrated with the PDF text. `append_to_page`: Attaches OCR text directly after the corresponding page text (maintains document structure). `separate_chunks`: Creates a distinct section for all OCR text separate from PDF text. `combine_all`: Appends all OCR text to the end of the document. |
+| `use_markdown_extraction` | boolean | `false` | `true` or `false` | When enabled, extracts PDF content in markdown format using `pymupdf4llm`, which preserves document structure such as headers, lists, tables, and formatting. When disabled, uses plain text extraction via PyMuPDF (fitz) which is faster but loses structural information. Enable this for documents where structure is important for chunking and retrieval. |
+| `chunking_strategy` | string | `"recursive"` | `"recursive"`, `"fixed-size"`, `"nltk-sentence"`, `"nltk-paragraphs"`, or `"1-chunk"` | Determines how the extracted text is split into chunks. `recursive`: Intelligently splits text respecting semantic boundaries (recommended for most use cases). `fixed-size`: Creates uniform chunks of equal size with overlap. `nltk-sentence`: Splits by sentences using NLTK. `nltk-paragraphs`: Splits by paragraphs using NLTK. `1-chunk`: No splitting, entire document as one chunk (useful for short documents). |
+| `max_chunk_size` | integer | `300` | `1` to `2000` characters | Maximum size of each text chunk in characters. Smaller chunks provide more granular retrieval but may lose context. Larger chunks maintain more context but may be less precise. Recommended range: 300-500 for most RAG applications. This parameter works with `chunk_overlap` to control chunk boundaries. |
+| `chunk_overlap` | integer | `20` | `0` to `400` characters | Number of characters that overlap between consecutive chunks. Overlap helps maintain context across chunk boundaries and prevents information loss at split points. Should be 10-20% of `max_chunk_size`. Set to 0 for no overlap. Higher values improve context preservation but increase storage requirements. |
+| `to_correct_spelling` | boolean | `false` | `true` or `false` | When enabled, applies text cleaning and normalization using the `unstructured.io` library. This includes: unicode quote replacement, non-ASCII character handling, punctuation normalization, and whitespace normalization. Enable for documents with OCR errors or inconsistent formatting. May slow down processing. |
 
 ### OCR Configuration
 
-**To use EasyOCR (default):**
+OCR processing uses **EasyOCR** for local, efficient text extraction from images embedded in PDFs.
+
+**To enable OCR:**
 ```json
 {
   "ocr_from_images": true,
-  "custom_ocr_model_id": null
+  "ocr_integration_method": "append_to_page"
 }
 ```
 
-**To use a custom Dataloop OCR model:**
-```json
-{
-  "ocr_from_images": true,
-  "custom_ocr_model_id": "your-model-id-here"
-}
-```
-⚠️ **Note**: Custom model must be deployed before use.
+⚠️ **Note**: OCR processing happens locally and does not require any external model deployment.
 
 ## 🚀 Deployment
 
@@ -108,15 +94,12 @@ All parameters are configured via the pipeline node in Dataloop.
 ```json
 {
   "ocr_from_images": true,
-  "custom_ocr_model_id": null,
   "ocr_integration_method": "append_to_page",
   "use_markdown_extraction": true,
   "chunking_strategy": "recursive",
   "max_chunk_size": 500,
   "chunk_overlap": 50,
-  "to_correct_spelling": false,
-  "remote_path_for_chunks": "/chunks",
-  "target_dataset": null
+  "to_correct_spelling": false
 }
 ```
 

@@ -4,7 +4,7 @@ Simple test for PDF Processor.
 Usage:
     python tests/test_pdf_processor.py
     
-    Edit the CONFIG and ITEM_ID variables below, then run the script.
+    Edit the ITEM_ID, TARGET_DATASET_ID, and CONFIG variables below, then run the script.
 """
 
 import sys
@@ -25,31 +25,30 @@ from pdf_processor import PDFProcessor
 # ============================================================
 
 # Your Dataloop item ID to test
-ITEM_ID = "item_id"
+ITEM_ID = "68f75aed8fecddfa09ae9f49"
+
+# Target dataset ID for storing chunks (required parameter)
+# Set to None to auto-create a {dataset_name}_chunks dataset
+TARGET_DATASET_ID = "68f758cd233f4db511ebfd08"
 
 # Configuration (matches dataloop.json schema)
 CONFIG = {
     'name': 'Test-PDF-Processor',
     
     # OCR Processing
-    'ocr_from_images': False,  # Extract images and apply OCR
-    'custom_ocr_model_id': None,  # Leave as None to use EasyOCR (default), or provide a deployed Dataloop OCR model ID
-    'ocr_integration_method': 'append_to_page',  # Options: 'append_to_page', 'separate_chunks', 'combine_all'
+    'ocr_from_images': True,  # Extract images and apply OCR (uses EasyOCR)
+    'ocr_integration_method': 'separate_chunks',  # Options: 'append_to_page', 'separate_chunks', 'combine_all'
     
     # Text Extraction
     'use_markdown_extraction': False,
     
     # Chunking Strategy
     'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed-size', 'nltk-sentence', 'nltk-paragraphs', '1-chunk'
-    'max_chunk_size': 5000,
+    'max_chunk_size': 500,
     'chunk_overlap': 20,
     
     # Text Cleaning
     'to_correct_spelling': True,
-    
-    # Output Settings
-    'remote_path_for_chunks': '/chunks',
-    'target_dataset': None,  # None = auto-create {dataset_name}_chunks
 }
 
 
@@ -73,12 +72,13 @@ class MockContext:
 # Test Function
 # ============================================================
 
-def test_pdf_processor(item_id: str, config: dict):
+def test_pdf_processor(item_id: str, target_dataset_id: str, config: dict):
     """
     Test PDF processor with a Dataloop item.
     
     Args:
         item_id: Dataloop item ID to process
+        target_dataset_id: Target dataset ID for storing chunks (None to auto-create)
         config: Configuration dictionary
         
     Returns:
@@ -97,6 +97,30 @@ def test_pdf_processor(item_id: str, config: dict):
         print(f"❌ Failed to retrieve item: {str(e)}")
         raise
     
+    # Get or create target dataset
+    print(f"\n📦 Setting up target dataset...")
+    if target_dataset_id:
+        try:
+            target_dataset = dl.datasets.get(dataset_id=target_dataset_id)
+            print(f"✅ Using specified dataset: {target_dataset.name} (ID: {target_dataset.id})")
+        except Exception as e:
+            print(f"❌ Failed to get target dataset: {str(e)}")
+            raise
+    else:
+        # Auto-create chunks dataset
+        original_dataset_name = item.dataset.name
+        new_dataset_name = f"{original_dataset_name}_chunks"
+        print(f"📝 Auto-creating dataset: {new_dataset_name}")
+        
+        try:
+            # Try to get existing dataset
+            target_dataset = item.project.datasets.get(dataset_name=new_dataset_name)
+            print(f"✅ Using existing chunks dataset: {target_dataset.name} (ID: {target_dataset.id})")
+        except dl.exceptions.NotFound:
+            # Create new dataset
+            target_dataset = item.project.datasets.create(dataset_name=new_dataset_name)
+            print(f"✅ Created new dataset: {target_dataset.name} (ID: {target_dataset.id})")
+    
     # Show configuration
     print(f"\n📋 Configuration:")
     for key, value in config.items():
@@ -112,7 +136,7 @@ def test_pdf_processor(item_id: str, config: dict):
     # Process the item
     print(f"\n⚙️  Processing PDF...")
     try:
-        chunk_items = processor.process_document(item, context)
+        chunk_items = processor.process_document(item, target_dataset, context)
         
         print(f"\n{'='*60}")
         print(f"✅ Success!")
@@ -143,10 +167,10 @@ def test_pdf_processor(item_id: str, config: dict):
 # ============================================================
 
 if __name__ == '__main__':
-    """Run the test with the configured item ID and config."""
+    """Run the test with the configured item ID, target dataset, and config."""
     # Run test
     try:
-        chunks = test_pdf_processor(ITEM_ID, CONFIG)
+        chunks = test_pdf_processor(ITEM_ID, TARGET_DATASET_ID, CONFIG)
         print(f"\n✅ Test completed successfully!")
         sys.exit(0)
     except Exception as e:
