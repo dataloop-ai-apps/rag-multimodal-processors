@@ -72,17 +72,16 @@ def get_or_create_target_dataset(original_item: dl.Item, target_dataset: Optiona
 def upload_chunks(chunks: List[str], 
                  original_item: dl.Item, 
                  target_dataset: dl.Dataset,
-                 remote_path: str,
-                 processor_metadata: Dict[str, Any]) -> List[dl.Item]:
+                 remote_path: str) -> List[dl.Item]:
     """
     Upload text chunks as items to the target dataset using BytesIO buffers.
+    Each chunk item gets minimal metadata with reference to original item and chunk index.
     
     Args:
         chunks (List[str]): Text chunks to upload
         original_item (dl.Item): Original document item
         target_dataset (dl.Dataset): Target dataset for chunks
         remote_path (str): Remote path in dataset
-        processor_metadata (Dict[str, Any]): Metadata specific to the processor
         
     Returns:
         List[dl.Item]: Uploaded chunk items
@@ -92,55 +91,46 @@ def upload_chunks(chunks: List[str],
         f"remote_path={remote_path} target_dataset={target_dataset.name}"
     )
     
-    # Create BytesIO buffers for each chunk
-    binaries = []
-    for idx, chunk in enumerate(chunks):
-        base_name = Path(original_item.name).stem
+    total_chunks = len(chunks)
+    base_name = Path(original_item.name).stem
+    full_remote_path = os.path.join(remote_path, original_item.dir.lstrip('/')).replace('\\', '/')
+    
+    # Upload chunks individually with their own metadata
+    uploaded_items = []
+    
+    for idx, chunk in enumerate(chunks, start=1):
         chunk_filename = f"{base_name}_chunk_{idx:04d}.txt"
         
         # Create BytesIO buffer
         buffer = io.BytesIO(chunk.encode('utf-8'))
         buffer.name = chunk_filename
         buffer.seek(0)
-        binaries.append(buffer)
-    
-    # Create metadata using shared ChunkMetadata class
-    base_metadata = ChunkMetadata.create(
-        original_item=original_item,
-        total_chunks=len(chunks),
-        processor_specific_metadata=processor_metadata
-    )
-    
-    full_remote_path = os.path.join(remote_path, original_item.dir.lstrip('/')).replace('\\', '/')
-    
-    # Bulk upload chunks
-    uploaded_items = target_dataset.items.upload(
-        local_path=binaries,
-        remote_path=full_remote_path,
-        item_metadata=base_metadata,
-        overwrite=True,
-        raise_on_error=True,
-    )
-    
-    # Handle single item vs list response
-    if uploaded_items is None:
-        logger.error(
-            f"Upload returned None | item_id={original_item.id} chunks={len(binaries)}"
+        
+        # Create metadata for this specific chunk
+        chunk_metadata = ChunkMetadata.create_for_chunk(
+            original_item=original_item,
+            chunk_index=idx,
+            total_chunks=total_chunks
         )
-        raise dl.PlatformException(f"No chunks were uploaded! Total chunks: {len(binaries)}")
-    elif isinstance(uploaded_items, dl.Item):
-        uploaded_items = [uploaded_items]
-    else:
-        uploaded_items = [item for item in uploaded_items]
+        
+        # Upload single chunk
+        try:
+            uploaded_item = target_dataset.items.upload(
+                local_path=buffer,
+                remote_path=full_remote_path,
+                item_metadata=chunk_metadata,
+                overwrite=True,
+            )
+            uploaded_items.append(uploaded_item)
+            
+        except Exception as e:
+            logger.error(f"Failed to upload chunk {idx}: {e}")
+            # Continue with other chunks
+            continue
     
-    try:
-        uploaded_names = [it.name for it in uploaded_items]
-    except Exception:
-        uploaded_names = ["<unknown>"]
-
     logger.info(
-        f"Upload completed | item_id={original_item.id} uploaded_count={len(uploaded_items)} "
-        f"remote_path={full_remote_path} sample_names={uploaded_names[:3]}"
+        f"Upload completed | item_id={original_item.id} uploaded_count={len(uploaded_items)}/{total_chunks} "
+        f"remote_path={full_remote_path}"
     )
     
     return uploaded_items

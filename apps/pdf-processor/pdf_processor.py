@@ -117,17 +117,27 @@ class PDFProcessor(dl.BaseServiceRunner):
             logger.info("Applying text cleaning")
             chunks = [clean_text(chunk) for chunk in chunks]
         
-        # Get processor-specific metadata
-        processor_metadata = self._get_metadata(total_pages, use_markdown_extraction)
-        processor_metadata['chunking_strategy'] = chunking_strategy
+        # Update original item metadata with processing info
+        self._update_original_item_metadata(
+            item=item,
+            total_pages=total_pages,
+            total_chunks=len(chunks),
+            target_dataset_id=target_dataset.id,
+            use_markdown_extraction=use_markdown_extraction,
+            chunking_strategy=chunking_strategy,
+            max_chunk_size=max_chunk_size,
+            chunk_overlap=chunk_overlap,
+            ocr_from_images=ocr_from_images,
+            ocr_integration_method=ocr_integration_method,
+            to_correct_spelling=to_correct_spelling
+        )
         
         # Upload chunks
         chunked_items = upload_chunks(
             chunks=chunks,
             original_item=item,
             target_dataset=target_dataset,
-            remote_path=remote_path_for_chunks,
-            processor_metadata=processor_metadata
+            remote_path=remote_path_for_chunks
         )
         
         logger.info(
@@ -565,21 +575,57 @@ class PDFProcessor(dl.BaseServiceRunner):
                 all_text += f"\n\n[OCR_PAGE_{ocr_result['page_index']}_IMAGE_{ocr_result['image_index']}]\n{ocr_result['text']}" if ocr_result['text'] else ''
             return all_text
 
-    def _get_metadata(self, total_pages: int, use_markdown_extraction: bool) -> Dict[str, Any]:
+    def _update_original_item_metadata(
+        self,
+        item: dl.Item,
+        total_pages: int,
+        total_chunks: int,
+        target_dataset_id: str,
+        use_markdown_extraction: bool,
+        chunking_strategy: str,
+        max_chunk_size: int,
+        chunk_overlap: int,
+        ocr_from_images: bool,
+        ocr_integration_method: str,
+        to_correct_spelling: bool
+    ) -> None:
         """
-        Get processor-specific metadata.
+        Update the original PDF item's metadata with processing information.
         
         Args:
+            item: Original PDF item to update
             total_pages: Total number of pages in the PDF
+            total_chunks: Number of chunks created
+            target_dataset_id: Dataset ID where chunks were stored
             use_markdown_extraction: Whether markdown extraction was used
-            
-        Returns:
-            Dict with processor-specific metadata fields
+            chunking_strategy: Chunking strategy used
+            max_chunk_size: Maximum chunk size in characters
+            chunk_overlap: Overlap between chunks in characters
+            ocr_from_images: Whether OCR was enabled
+            ocr_integration_method: How OCR text was integrated
+            to_correct_spelling: Whether text cleaning was applied
         """
-        return {
+        from datetime import datetime
+        
+        processing_metadata = {
             'total_pages': total_pages,
+            'total_chunks': total_chunks,
+            'chunks_dataset_id': target_dataset_id,
             'extraction_method': 'pymupdf4llm' if use_markdown_extraction else 'fitz',
             'extraction_format': 'markdown' if use_markdown_extraction else 'plain',
-            'markdown_aware_splitting': use_markdown_extraction,
+            'chunking_strategy': chunking_strategy,
+            'chunk_size': max_chunk_size,
+            'chunk_overlap': chunk_overlap,
+            'ocr_enabled': ocr_from_images,
+            'ocr_integration_method': ocr_integration_method if ocr_from_images else None,
+            'text_cleaning_enabled': to_correct_spelling,
+            'processing_timestamp': datetime.utcnow().isoformat() + 'Z'
         }
+        
+        # Update item metadata
+        item.metadata['user'] = item.metadata.get('user', {})
+        item.metadata['user'].update(processing_metadata)
+        item.update(system_metadata=True)
+        
+        logger.info(f"Updated original item metadata | item_id={item.id} total_chunks={total_chunks}")
 

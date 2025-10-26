@@ -25,11 +25,11 @@ from pdf_processor import PDFProcessor
 # ============================================================
 
 # Your Dataloop item ID to test
-ITEM_ID = "item_id_to_test"
+ITEM_ID = "item_id"
 
 # Target dataset ID for storing chunks (required parameter)
 # Set to None to auto-create a {dataset_name}_chunks dataset
-TARGET_DATASET_ID = "dataset_id_to_store_chunks"
+TARGET_DATASET_ID = "dataset_id"
 
 # Configuration (matches dataloop.json schema)
 CONFIG = {

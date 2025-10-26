@@ -121,23 +121,66 @@ document.pdf → document_chunk_0001.txt
 
 ### Metadata Structure
 
-Each chunk includes comprehensive metadata for provenance tracking:
+The processor creates two types of metadata:
+
+#### 1. Original PDF Item Metadata
+
+The original PDF document is updated with processing information:
+
+```json
+{
+  "user": {
+    "total_pages": 25,
+    "total_chunks": 120,
+    "chunks_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
+    "extraction_method": "pymupdf4llm",
+    "extraction_format": "markdown",
+    "chunking_strategy": "recursive",
+    "chunk_size": 500,
+    "chunk_overlap": 50,
+    "ocr_enabled": true,
+    "ocr_integration_method": "append_to_page",
+    "text_cleaning_enabled": false,
+    "processing_timestamp": "2024-10-26T10:30:00Z"
+  }
+}
+```
+
+**Fields:**
+- `total_pages`: Number of pages in the PDF
+- `total_chunks`: Total number of chunks created
+- `chunks_dataset_id`: Dataset ID where chunks were stored
+- `extraction_method`: Library used (`pymupdf4llm` or `fitz`)
+- `extraction_format`: Output format (`markdown` or `plain`)
+- `chunking_strategy`: Strategy used (`recursive`, `fixed-size`, etc.)
+- `chunk_size`: Maximum chunk size in characters
+- `chunk_overlap`: Overlap between chunks in characters
+- `ocr_enabled`: Whether OCR processing was applied
+- `ocr_integration_method`: How OCR text was integrated (only if OCR enabled)
+- `text_cleaning_enabled`: Whether text cleaning was applied
+- `processing_timestamp`: ISO 8601 timestamp (UTC) of processing
+
+#### 2. Chunk Item Metadata
+
+Each chunk item contains minimal reference information:
 
 ```json
 {
   "user": {
     "document": "example.pdf",
     "document_type": "application/pdf",
-    "total_pages": 25,
+    "chunk_index": 1,
     "total_chunks": 120,
-    "extraction_method": "pymupdf4llm",
-    "extraction_format": "markdown",
-    "chunking_strategy": "recursive",
-    "markdown_aware_splitting": true,
-    "extracted_chunk": true,
     "original_item_id": "65f2a3b4c1e2d3f4a5b6c7d8",
-    "original_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
-    "processing_timestamp": 1698765432.123
+    "original_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d0"
   }
 }
 ```
+
+**Fields:**
+- `document`: Original filename
+- `document_type`: MIME type of the original document
+- `chunk_index`: Index of this chunk (1-based, starts at 1)
+- `total_chunks`: Total number of chunks from the document
+- `original_item_id`: Dataloop item ID of the original PDF
+- `original_dataset_id`: Dataloop dataset ID of the original PDF
