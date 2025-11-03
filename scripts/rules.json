@@ -1,0 +1,11 @@
+{
+  "rules": [
+    {
+      "name": "Prefer @dataloop-ai/components for UI",
+      "description": "When implementing UI from Figma designs, check first if the component exists in @dataloop-ai/components",
+      "pattern": "(?i)figma",
+      "message": "Before implementing custom UI components from Figma, please check if the component already exists in @dataloop-ai/components library.",
+      "severity": "warning"
+    }
+  ]
+}
