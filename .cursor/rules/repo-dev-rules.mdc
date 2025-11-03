@@ -1,0 +1,13 @@
+---
+alwaysApply: false
+---
+
+# Making changes to the repo
+When adding functionality to the repo, first review the "architecture" directory to see what the product requirements, specs, and record on the project are. 
+
+# Relevant context
+When reviewing the code, read docs only from the following directories:
+- chunkers
+- extractors
+- pipeline
+
