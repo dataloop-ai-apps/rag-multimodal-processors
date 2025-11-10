@@ -1,326 +1,243 @@
-# CLAUDE.md
+# Development Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guide for Claude Code when working with this repository.
 
-## Development Workflow
+## Workflow
 
-**Plan Mode (Default):**
-- Start in PLAN mode for every new task
-- Gather information and create plans without making changes
-- Only move to ACT mode when user types `ACT`
-- Do NOT make any changes to code without explicit approval
+- Start in **PLAN mode** - gather info, create plans
+- Move to **ACT mode** only when user types `ACT`
+- Do NOT make changes without approval
 
-## Architecture Overview
+## Architecture
 
-The system uses **nested function composition** with three main components:
+System uses **app-based architecture** with simple function composition:
 
-1. **Extractors** (`extractors.py`) - Extract multimodal content from different file types
-2. **Stages** (`stages/`) - Atomic processing operations with consistent signatures
-3. **Main API** (`main.py`) - Orchestration with built-in processing levels
+1. **Apps** (`apps/`) - File-type specific processor classes (PDFApp, DOCApp)
+2. **Extractors** (`extractors.py`) - Extract content from files (PDF, DOC only)
+3. **Stages** (`stages/`) - Shared processing functions with `(data: dict, config: dict) -> dict` signature
+4. **Main API** (`main.py`) - Routes requests to appropriate apps
 
-**Architecture Context:**
-When reviewing the code, prioritize reading docs from these directories:
-- `main.py` - Main API and orchestrator with 4 built-in processing levels
-- `extractors.py` - File type extractors (PDF, HTML, .docx, text, images, email)
-- `stages/` - Processing stages (preprocessing, chunking, OCR, LLM, upload)
-- `chunkers/` - Shared text chunking implementations
-- `extractors/` (directory) - Shared extractors (OCR)
-- `utils/` - Shared utilities (dataloop_helpers, chunk_metadata, text_cleaning)
-- `architecture/` - Product requirements and specifications
-
-When adding functionality, ensure any reusable components follow the appropriate pattern:
-- New file types → Add to `extractors.py` and register in `EXTRACTOR_REGISTRY`
-- New processing operations → Add to `stages/` with signature `(data: dict, config: dict) -> dict`
-- New processing levels → Use `register_processing_level()` in `main.py`
-
-## Commands
-
-### Testing
-```bash
-# Run all tests
-python -m pytest tests/
-
-# Run with verbose output
-python -m pytest tests/ -v
-```
-
-### Development
-```bash
-# Install dependencies (project uses .venv virtual environment)
-python -m pip install -r requirements.txt
-
-# Example usage (requires Dataloop credentials)
-python main.py
-```
+### Supported File Types
+- **PDF** (.pdf) - via `apps/pdf-processor/pdf_app.py`
+- **DOC** (.docx) - via `apps/doc-processor/doc_app.py`
 
 ## Repository Structure
 
 ```
 rag-multimodal-processors/
-├── main.py                      # Main API with processing levels
-├── extractors.py                # Multimodal extractors (PDF, HTML, docs, text, images, email)
-├── stages/                      # Processing stages (consistent signatures)
-│   ├── preprocessing.py         # clean_text, normalize_whitespace
-│   ├── chunking.py              # chunk_recursive, chunk_by_sentence, etc.
-│   ├── ocr.py                   # ocr_enhance, describe_images_with_dataloop
-│   ├── llm.py                   # llm_chunk_semantic, llm_summarize, llm_translate
-│   └── upload.py                # upload_to_dataloop, upload_with_images
-├── chunkers/                    # Shared chunking implementations
-│   └── text_chunker.py          # TextChunker with 5 strategies
-├── extractors/ (dir)            # Shared extractors (OCR)
-│   └── ocr_extractor.py         # OCRExtractor (EasyOCR + Dataloop models)
-├── utils/                       # Shared utilities
-│   ├── dataloop_helpers.py      # Chunk upload, dataset management
-│   ├── chunk_metadata.py        # ChunkMetadata class
-│   └── text_cleaning.py         # Text normalization
-└── architecture/                # Documentation
-    ├── SYSTEM_ARCHITECTURE.md   # Detailed architecture
-    └── product_requirements.md  # Product requirements
+├── main.py                      # Main API - routes to apps
+├── extractors.py                # PDF & DOC extractors only
+├── apps/                        # File type processors
+│   ├── pdf-processor/
+│   │   ├── pdf_app.py          # PDFApp class
+│   │   ├── dataloop.json       # Dataloop app config
+│   │   └── Dockerfile
+│   └── doc-processor/
+│       ├── doc_app.py          # DOCApp class
+│       ├── dataloop.json
+│       └── Dockerfile
+├── stages/                      # Shared processing stages
+│   ├── preprocessing.py        # Text cleaning
+│   ├── chunking.py             # Chunking strategies
+│   ├── ocr.py                  # OCR enhancement
+│   ├── llm.py                  # LLM operations
+│   └── upload.py               # Dataloop upload
+├── chunkers/                    # Chunking implementations
+├── extractors/                  # Shared utilities (OCR)
+└── utils/                       # Helpers
 ```
 
-## Core Design Principles
+## Key Files
 
-1. **Simple Nested Functions**: No piping operators or complex frameworks
-2. **Consistent Signatures**: All stages follow `(data: dict, config: dict) -> dict`
-3. **Multimodal Extraction**: Text, images, tables in one pass
-4. **Four Processing Levels**: basic, ocr, llm, advanced
-5. **Easy to Extend**: Add extractors, stages, or levels with minimal code
-
-## Processing Levels
-
-The system provides four built-in processing levels using nested function calls:
-
-### Basic Processing
-```python
-def basic_processing(data, config):
-    data = stages.clean_text(data, config)
-    data = stages.normalize_whitespace(data, config)
-    data = stages.chunk_recursive(data, config)
-    data = stages.upload_to_dataloop(data, config)
-    return data
-```
-
-### OCR Processing
-```python
-def ocr_processing(data, config):
-    config['use_ocr'] = True
-    data = stages.ocr_enhance(data, config)
-    data = stages.clean_text(data, config)
-    data = stages.normalize_whitespace(data, config)
-    data = stages.chunk_recursive(data, config)
-    data = stages.upload_to_dataloop(data, config)
-    return data
-```
-
-### LLM Processing
-```python
-def llm_processing(data, config):
-    data = stages.clean_text(data, config)
-    data = stages.normalize_whitespace(data, config)
-    data = stages.llm_chunk_semantic(data, config)
-    data = stages.upload_to_dataloop(data, config)
-    return data
-```
-
-### Advanced Processing
-```python
-def advanced_processing(data, config):
-    config['use_ocr'] = True
-    config['describe_images'] = True
-    data = stages.ocr_enhance(data, config)
-    data = stages.describe_images_with_dataloop(data, config)
-    data = stages.clean_text(data, config)
-    data = stages.normalize_whitespace(data, config)
-    data = stages.llm_chunk_semantic(data, config)
-    data = stages.upload_with_images(data, config)
-    return data
-```
-
-## Key File References
-
-When implementing new features or fixing bugs:
-
-- **Main orchestration**: `main.py` - Processing levels and convenience functions
-- **Content extraction**: `extractors.py` - All file type extractors
-- **Processing stages**: `stages/` - All processing operations
-- **Chunking strategies**: `chunkers/text_chunker.py`
-- **OCR implementation**: `extractors/ocr_extractor.py`
-- **Chunk upload logic**: `utils/dataloop_helpers.py:upload_chunks()`
-- **Architecture documentation**: `architecture/SYSTEM_ARCHITECTURE.md`
+- **Main API**: `main.py` - Entry point, routes to apps
+- **PDF App**: `apps/pdf-processor/pdf_app.py`
+- **DOC App**: `apps/doc-processor/doc_app.py`
+- **Extractors**: `extractors.py` - PDF & DOC only
+- **Stages**: `stages/` - Shared processing functions
+- **Chunking**: `chunkers/text_chunker.py`
+- **OCR**: `extractors/ocr_extractor.py`
+- **Upload**: `utils/dataloop_helpers.py`
 
 ## Common Patterns
 
-### Adding a New File Type
-1. Add extractor to `extractors.py`:
+### Add New File Type
+
+To add support for a new file type (e.g., Excel, PowerPoint):
+
+1. **Create extractor** in `extractors.py`:
 ```python
-class AudioExtractor(BaseExtractor):
+class XLSExtractor(BaseExtractor):
     def __init__(self):
-        super().__init__('audio/mpeg', 'Audio')
+        super().__init__('application/vnd.ms-excel', 'XLS')
 
     def extract(self, item, config):
-        result = ExtractedContent()
-        result.text = "transcribed text"
-        result.audio = [AudioContent(path=file_path, duration=duration)]
-        result.metadata = {'extractor': 'audio'}
-        return result
+        # Extract content from file
+        return ExtractedContent(text="...")
 ```
 
-2. Register in `EXTRACTOR_REGISTRY`:
+2. **Register extractor**:
 ```python
-EXTRACTOR_REGISTRY['audio/mpeg'] = AudioExtractor
+EXTRACTOR_REGISTRY['application/vnd.ms-excel'] = XLSExtractor
 ```
 
-3. Use immediately:
+3. **Create app directory**: `apps/xls-processor/`
+
+4. **Create app class** in `apps/xls-processor/xls_app.py`:
 ```python
-result = process_item(item, dataset, 'basic')  # Auto-detects MIME type
+import logging
+from typing import Dict, Any, List
+import dtlpy as dl
+from extractors import XLSExtractor
+import stages
+
+class XLSApp:
+    def __init__(self, item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any] = None):
+        self.item = item
+        self.target_dataset = target_dataset
+        self.config = config or {}
+        self.extractor = XLSExtractor()
+        self.logger = logging.getLogger(f"XLSApp.{item.id[:8]}")
+
+    def extract(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        extracted = self.extractor.extract(self.item, self.config)
+        data.update(extracted.to_dict())
+        return data
+
+    def clean(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        data = stages.clean_text(data, self.config)
+        return data
+
+    def chunk(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        data = stages.chunk_recursive(data, self.config)
+        return data
+
+    def upload(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        data = stages.upload_to_dataloop(data, self.config)
+        return data
+
+    def run(self) -> List[dl.Item]:
+        data = {'item': self.item, 'target_dataset': self.target_dataset}
+        data = self.extract(data)
+        data = self.clean(data)
+        data = self.chunk(data)
+        data = self.upload(data)
+        return data.get('uploaded_items', [])
 ```
 
-### Adding a New Processing Stage
-1. Create function in `stages/`:
+5. **Register in main.py**:
 ```python
-def my_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """My custom processing"""
-    data['content'] = transform(data['content'])
-    data.setdefault('metadata', {})['my_stage_applied'] = True
+from xls_app import XLSApp
+APP_REGISTRY['application/vnd.ms-excel'] = XLSApp
+```
+
+### Add New Processing Stage
+
+1. Create in `stages/`:
+```python
+def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Process data in custom way."""
+    content = data.get('content', '')
+    # Transform content
+    data['content'] = transformed_content
     return data
 ```
 
 2. Export from `stages/__init__.py`:
 ```python
-from .mystages import my_stage
-__all__ = [..., 'my_stage']
+from .preprocessing import my_custom_stage
+__all__ = [..., 'my_custom_stage']
 ```
 
-3. Use in workflows:
+3. Use in any app:
 ```python
-custom_workflow = [stages.clean_text, my_stage, stages.upload_to_dataloop]
-result = process_custom(item, dataset, custom_workflow)
-```
-
-### Adding a Custom Processing Level
-1. Define level function:
-```python
-def translation_level(data, config):
-    data = stages.clean_text(data, config)
-    data = stages.llm_translate(data, config)
-    data = stages.chunk_recursive(data, config)
-    data = stages.upload_to_dataloop(data, config)
+def run(self):
+    data = self.extract(data)
+    data = stages.my_custom_stage(data, self.config)  # Use your custom stage
+    data = self.chunk(data)
     return data
 ```
 
-2. Register:
+## Example Workflows
+
+### Basic PDF Processing
 ```python
-from main import register_processing_level
-register_processing_level('translate', translation_level)
+from main import process_pdf
+
+chunks = process_pdf(
+    item=pdf_item,
+    target_dataset=chunks_dataset
+)
 ```
 
-3. Use like built-in levels:
+### PDF with OCR
 ```python
-result = process_pdf(item, dataset, level='translate',
-                    llm_model_id='...', target_language='Spanish')
+chunks = process_pdf(
+    item=pdf_item,
+    target_dataset=chunks_dataset,
+    use_ocr=True
+)
 ```
 
-### Custom Workflow
+### PDF with Custom Chunking
 ```python
-from main import process_custom
-import stages
-
-custom_workflow = [
-    stages.ocr_enhance,
-    stages.clean_text,
-    stages.chunk_by_sentence,
-    stages.upload_to_dataloop
-]
-
-result = process_custom(item, dataset, custom_workflow, {'use_ocr': True})
+chunks = process_pdf(
+    item=pdf_item,
+    target_dataset=chunks_dataset,
+    max_chunk_size=500,
+    chunk_overlap=50,
+    chunking_strategy='semantic',
+    llm_model_id='your-model-id'
+)
 ```
+
+### DOC Processing
+```python
+from main import process_doc
+
+chunks = process_doc(
+    item=docx_item,
+    target_dataset=chunks_dataset,
+    max_chunk_size=1000
+)
+```
+
+### Batch Processing
+```python
+from main import process_batch
+
+items = dataset.items.list()
+results = process_batch(
+    items=items,
+    target_dataset=chunks_dataset,
+    config={'use_ocr': True}
+)
+```
+
+## Testing
+
+```bash
+python tests/test_pdf.py       # Edit test_config.py first
+python tests/test_doc.py
+```
+
+See `tests/README.md` for details.
 
 ## Dataloop Integration
 
-All processing uses **Dataloop items directly**:
-- `item.download()` to get file locally → process → `dataset.items.upload()` for chunks
-- Configuration retrieved via context or passed as dict
-- All LLM/vision processing uses Dataloop models (no external APIs)
-- Temporary items/folders cleaned up after processing
+- All processing uses Dataloop items directly
+- `item.download()` → process → `dataset.items.upload()`
+- All LLM/vision via Dataloop models only
 
-## Testing Structure
-
-**Tests** (`tests/`):
-- Integration tests requiring Dataloop credentials
-- Use placeholder values: `ITEM_ID`, `TARGET_DATASET_ID`
-- Test individual stages and complete processing levels
-
-## Configuration System
-
-Configuration is passed as a dictionary to all stages:
+## Configuration
 
 ```python
 config = {
-    # Chunking
     'max_chunk_size': 300,
     'chunk_overlap': 20,
     'chunking_strategy': 'recursive',
-
-    # OCR
     'use_ocr': True,
-    'ocr_integration_method': 'append',
-
-    # LLM
-    'llm_model_id': 'your-dataloop-model-id',
-    'vision_model_id': 'your-vision-model-id',
-    'generate_summary': True,
-
-    # Extraction
-    'extract_images': True,
-    'extract_tables': False,
-    'use_markdown_extraction': False,
-
-    # Upload
-    'upload_images': False,
+    'llm_model_id': 'model-id',
 }
 ```
 
-## Error Handling
-
-### Stage-Level
-Stages handle errors gracefully:
-```python
-def my_stage(data, config):
-    try:
-        # Process
-        return data
-    except Exception as e:
-        print(f"Warning: {e}")
-        return data  # Return unchanged on error
-```
-
-### Processing-Level
-Main API handles extraction and orchestration errors:
-```python
-try:
-    result = process_item(item, dataset, 'ocr')
-except ValueError as e:
-    # Invalid processing level or unsupported MIME type
-    print(f"Error: {e}")
-```
-
-## Why Nested Functions?
-
-1. **Simplicity**: Easy to read and understand
-2. **Explicit**: Clear execution order
-3. **Flexible**: Easy to create custom sequences
-4. **No magic**: No operator overloading or hidden behavior
-5. **Standard Python**: Uses familiar patterns
-
-Compare:
-```python
-# Nested functions (current approach)
-data = stages.clean_text(data, config)
-data = stages.chunk_recursive(data, config)
-data = stages.upload_to_dataloop(data, config)
-
-# vs. Complex piping (avoided)
-data = data | clean_text | chunk_recursive | upload_to_dataloop
-```
-
-The nested function approach is more explicit and easier to debug.
+All stages receive the same config dict.

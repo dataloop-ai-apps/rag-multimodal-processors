@@ -1,7 +1,0 @@
----
-name: suggest-performance-tips
-mode: auto
----
-
-When performance concerns are relevant:
-- Suggest caching for repeated 

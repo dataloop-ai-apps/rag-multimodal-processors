@@ -1,6 +1,10 @@
 """
-Content extractors for different file types.
+Content extractors for PDF and DOC files.
 All extractors return multimodal content (text, images, tables, etc.).
+
+Supported file types:
+    - PDF (.pdf)
+    - Microsoft Word (.docx)
 
 Extractors focus solely on content extraction from files.
 Processing stages (OCR, chunking, etc.) are in the stages/ directory.
@@ -13,21 +17,22 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import dtlpy as dl
 
-
 # ============================================================================
 # MULTIMODAL DATA STRUCTURES
 # ============================================================================
 
+
 @dataclass
 class ImageContent:
     """Represents an extracted image"""
-    path: str                           # File path or temp path
-    caption: Optional[str] = None       # Image caption/alt text
-    page_number: Optional[int] = None   # Source page (for PDFs)
-    bbox: Optional[tuple] = None        # Bounding box (x, y, w, h)
-    format: Optional[str] = None        # png, jpg, etc.
-    size: Optional[tuple] = None        # (width, height)
-    data: Optional[bytes] = None        # Raw image bytes (optional)
+
+    path: str  # File path or temp path
+    caption: Optional[str] = None  # Image caption/alt text
+    page_number: Optional[int] = None  # Source page (for PDFs)
+    bbox: Optional[tuple] = None  # Bounding box (x, y, w, h)
+    format: Optional[str] = None  # png, jpg, etc.
+    size: Optional[tuple] = None  # (width, height)
+    data: Optional[bytes] = None  # Raw image bytes (optional)
 
     def to_dict(self):
         return {
@@ -36,36 +41,38 @@ class ImageContent:
             'page_number': self.page_number,
             'bbox': self.bbox,
             'format': self.format,
-            'size': self.size
+            'size': self.size,
         }
 
 
 @dataclass
 class TableContent:
     """Represents an extracted table"""
-    data: Any                           # pandas DataFrame or list of dicts
-    markdown: Optional[str] = None      # Table as markdown
-    html: Optional[str] = None          # Table as HTML
-    page_number: Optional[int] = None   # Source page
-    location: Optional[Dict] = None     # Position info
+
+    data: Any  # pandas DataFrame or list of dicts
+    markdown: Optional[str] = None  # Table as markdown
+    html: Optional[str] = None  # Table as HTML
+    page_number: Optional[int] = None  # Source page
+    location: Optional[Dict] = None  # Position info
 
     def to_dict(self):
         return {
             'markdown': self.markdown,
             'html': self.html,
             'page_number': self.page_number,
-            'location': self.location
+            'location': self.location,
         }
 
 
 @dataclass
 class AudioContent:
     """Represents audio content"""
-    path: str                           # File path
-    duration: Optional[float] = None    # Duration in seconds
-    transcript: Optional[str] = None    # Transcription
-    format: Optional[str] = None        # mp3, wav, etc.
-    sample_rate: Optional[int] = None   # Sample rate
+
+    path: str  # File path
+    duration: Optional[float] = None  # Duration in seconds
+    transcript: Optional[str] = None  # Transcription
+    format: Optional[str] = None  # mp3, wav, etc.
+    sample_rate: Optional[int] = None  # Sample rate
 
     def to_dict(self):
         return {
@@ -73,7 +80,7 @@ class AudioContent:
             'duration': self.duration,
             'transcript': self.transcript,
             'format': self.format,
-            'sample_rate': self.sample_rate
+            'sample_rate': self.sample_rate,
         }
 
 
@@ -83,7 +90,8 @@ class ExtractedContent:
     Multimodal content extracted from document.
     Can contain text, images, tables, audio, etc.
     """
-    text: str = ""                              # Main text content
+
+    text: str = ""  # Main text content
     images: List[ImageContent] = field(default_factory=list)
     tables: List[TableContent] = field(default_factory=list)
     audio: List[AudioContent] = field(default_factory=list)
@@ -96,7 +104,7 @@ class ExtractedContent:
             'images': [img.to_dict() for img in self.images],
             'tables': [tbl.to_dict() for tbl in self.tables],
             'audio': [aud.to_dict() for aud in self.audio],
-            'metadata': self.metadata
+            'metadata': self.metadata,
         }
 
     def has_images(self) -> bool:
@@ -112,6 +120,7 @@ class ExtractedContent:
 # ============================================================================
 # BASE EXTRACTOR
 # ============================================================================
+
 
 class BaseExtractor(ABC):
     """Base class for all content extractors"""
@@ -139,63 +148,9 @@ class BaseExtractor(ABC):
 
 
 # ============================================================================
-# TEXT EXTRACTOR (.txt, .md, .csv)
-# ============================================================================
-
-class TextExtractor(BaseExtractor):
-    """Extract text from plain text, markdown, and CSV files"""
-
-    def __init__(self):
-        super().__init__('text/plain', 'Text')
-
-    def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
-        """Extract text with encoding detection"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = item.download(local_path=temp_dir)
-
-            # Detect encoding
-            if config.get('detect_encoding', True):
-                import chardet
-                with open(file_path, 'rb') as f:
-                    raw = f.read()
-                    result = chardet.detect(raw)
-                    encoding = result['encoding'] or 'utf-8'
-            else:
-                encoding = 'utf-8'
-
-            # Read text
-            with open(file_path, 'r', encoding=encoding, errors='replace') as f:
-                content = f.read()
-
-            # Special handling for CSV
-            if item.name.endswith('.csv') and config.get('preserve_csv_structure', False):
-                content = self._format_csv(file_path)
-
-            result = ExtractedContent()
-            result.text = content
-            result.metadata = {
-                'encoding': encoding,
-                'file_size': os.path.getsize(file_path),
-                'source_file': item.name,
-                'extractor': 'text'
-            }
-
-            return result
-
-    def _format_csv(self, file_path: str) -> str:
-        """Format CSV as structured text"""
-        import csv
-        lines = []
-        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                lines.append(', '.join([f"{k}: {v}" for k, v in row.items()]))
-        return '\n'.join(lines)
-
-
-# ============================================================================
 # PDF EXTRACTOR
 # ============================================================================
+
 
 class PDFExtractor(BaseExtractor):
     """Extract text, images, and tables from PDF files"""
@@ -216,8 +171,9 @@ class PDFExtractor(BaseExtractor):
             else:
                 return self._extract_with_pymupdf(file_path, item, temp_dir, config)
 
-    def _extract_with_pymupdf(self, file_path: str, item: dl.Item,
-                             temp_dir: str, config: Dict[str, Any]) -> ExtractedContent:
+    def _extract_with_pymupdf(
+        self, file_path: str, item: dl.Item, temp_dir: str, config: Dict[str, Any]
+    ) -> ExtractedContent:
         """Extract using basic PyMuPDF"""
         import fitz
 
@@ -242,14 +198,15 @@ class PDFExtractor(BaseExtractor):
             'extraction_method': 'pymupdf',
             'image_count': len(result.images),
             'table_count': len(result.tables),
-            'extractor': 'pdf'
+            'extractor': 'pdf',
         }
 
         doc.close()
         return result
 
-    def _extract_with_markdown(self, file_path: str, item: dl.Item,
-                              temp_dir: str, config: Dict[str, Any]) -> ExtractedContent:
+    def _extract_with_markdown(
+        self, file_path: str, item: dl.Item, temp_dir: str, config: Dict[str, Any]
+    ) -> ExtractedContent:
         """Extract using pymupdf4llm (preserves structure)"""
         import pymupdf4llm
         import fitz
@@ -273,15 +230,19 @@ class PDFExtractor(BaseExtractor):
             'extraction_method': 'pymupdf4llm',
             'format': 'markdown',
             'image_count': len(result.images),
-            'extractor': 'pdf'
+            'extractor': 'pdf',
         }
 
         return result
 
     def _extract_images_from_page(self, page, page_num: int, temp_dir: str) -> List[ImageContent]:
-        """Extract images from a PDF page"""
+        """
+        Extract images from a PDF page with positional metadata.
+
+        Extracts images along with their bounding box positions on the page.
+        """
         images = []
-        image_list = page.get_images()
+        image_list = page.get_images(full=True)
 
         for img_index, img in enumerate(image_list):
             try:
@@ -292,12 +253,24 @@ class PDFExtractor(BaseExtractor):
                 with open(image_path, 'wb') as f:
                     f.write(base_image['image'])
 
-                images.append(ImageContent(
-                    path=image_path,
-                    page_number=page_num + 1,
-                    format=base_image['ext'],
-                    size=(base_image.get('width'), base_image.get('height'))
-                ))
+                # Get image bounding boxes/positions on the page
+                bbox = None
+                image_rects = page.get_image_rects(xref)
+                if image_rects:
+                    # Use the first (or largest) rectangle if multiple found
+                    rect = image_rects[0] if isinstance(image_rects, list) else image_rects
+                    # Convert fitz.Rect to (x0, y0, x1, y1) then to (x, y, width, height)
+                    bbox = (rect.x0, rect.y0, rect.width, rect.height)  # x position  # y position  # width  # height
+
+                images.append(
+                    ImageContent(
+                        path=image_path,
+                        page_number=page_num + 1,
+                        format=base_image['ext'],
+                        size=(base_image.get('width'), base_image.get('height')),
+                        bbox=bbox,
+                    )
+                )
             except Exception as e:
                 print(f"Warning: Failed to extract image {img_index} from page {page_num}: {e}")
 
@@ -305,98 +278,15 @@ class PDFExtractor(BaseExtractor):
 
 
 # ============================================================================
-# HTML EXTRACTOR
-# ============================================================================
-
-class HTMLExtractor(BaseExtractor):
-    """Extract text and images from HTML files"""
-
-    def __init__(self):
-        super().__init__('text/html', 'HTML')
-
-    def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
-        """Extract content from HTML"""
-        from bs4 import BeautifulSoup
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = item.download(local_path=temp_dir)
-
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                html = f.read()
-
-            soup = BeautifulSoup(html, 'html.parser')
-            result = ExtractedContent()
-
-            # Extract text
-            if config.get('preserve_structure', True):
-                result.text = soup.get_text(separator='\n', strip=True)
-            else:
-                result.text = soup.get_text(separator=' ', strip=True)
-
-            # Extract images if requested
-            if config.get('extract_images', True):
-                result.images = self._extract_images(soup)
-
-            # Extract tables if requested
-            if config.get('extract_tables', False):
-                result.tables = self._extract_tables(soup)
-
-            # Extract metadata
-            title = soup.find('title')
-            meta_desc = soup.find('meta', attrs={'name': 'description'})
-
-            result.metadata = {
-                'title': title.get_text() if title else 'Untitled',
-                'description': meta_desc.get('content', '') if meta_desc else '',
-                'source_file': item.name,
-                'image_count': len(result.images),
-                'table_count': len(result.tables),
-                'extractor': 'html'
-            }
-
-            return result
-
-    def _extract_images(self, soup) -> List[ImageContent]:
-        """Extract images from HTML"""
-        images = []
-
-        for img_tag in soup.find_all('img'):
-            src = img_tag.get('src', '')
-            alt = img_tag.get('alt', '')
-
-            if src:
-                images.append(ImageContent(
-                    path=src,  # URL or relative path
-                    caption=alt
-                ))
-
-        return images
-
-    def _extract_tables(self, soup) -> List[TableContent]:
-        """Extract tables from HTML"""
-        tables = []
-
-        for table_tag in soup.find_all('table'):
-            tables.append(TableContent(
-                data=None,
-                html=str(table_tag)
-            ))
-
-        return tables
-
-
-# ============================================================================
 # DOCS EXTRACTOR (Google Docs as .docx)
 # ============================================================================
+
 
 class DocsExtractor(BaseExtractor):
     """Extract text and images from Google Docs (.docx)"""
 
     def __init__(self):
-        super().__init__(
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'Docs'
-        )
+        super().__init__('application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Docs')
 
     def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
         """Extract content from .docx"""
@@ -428,7 +318,7 @@ class DocsExtractor(BaseExtractor):
                 'source_file': item.name,
                 'image_count': len(result.images),
                 'table_count': len(result.tables),
-                'extractor': 'docs'
+                'extractor': 'docs',
             }
 
             return result
@@ -445,10 +335,11 @@ class DocsExtractor(BaseExtractor):
                     with open(image_path, 'wb') as f:
                         f.write(rel.target_part.blob)
 
-                    images.append(ImageContent(
-                        path=image_path,
-                        format=rel.target_ref.split('.')[-1] if '.' in rel.target_ref else None
-                    ))
+                    images.append(
+                        ImageContent(
+                            path=image_path, format=rel.target_ref.split('.')[-1] if '.' in rel.target_ref else None
+                        )
+                    )
         except Exception as e:
             print(f"Warning: Failed to extract images from .docx: {e}")
 
@@ -471,10 +362,7 @@ class DocsExtractor(BaseExtractor):
                 # Convert to markdown
                 markdown = self._table_to_markdown(headers, rows)
 
-                tables.append(TableContent(
-                    data=rows,
-                    markdown=markdown
-                ))
+                tables.append(TableContent(data=rows, markdown=markdown))
             except Exception as e:
                 print(f"Warning: Failed to extract table: {e}")
 
@@ -492,135 +380,15 @@ class DocsExtractor(BaseExtractor):
 
 
 # ============================================================================
-# EMAIL EXTRACTOR (.eml)
-# ============================================================================
-
-class EmailExtractor(BaseExtractor):
-    """Extract email content and attachments"""
-
-    def __init__(self):
-        super().__init__('message/rfc822', 'Email')
-
-    def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
-        """Extract email content"""
-        import email
-        from email import policy
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = item.download(local_path=temp_dir)
-
-            with open(file_path, 'rb') as f:
-                msg = email.message_from_binary_file(f, policy=policy.default)
-
-            # Extract headers
-            headers = {
-                'from': msg.get('From', ''),
-                'to': msg.get('To', ''),
-                'subject': msg.get('Subject', ''),
-                'date': msg.get('Date', '')
-            }
-
-            # Extract body
-            body = ""
-            if msg.is_multipart():
-                for part in msg.walk():
-                    if part.get_content_type() == 'text/plain':
-                        body = part.get_content()
-                        break
-            else:
-                body = msg.get_content()
-
-            result = ExtractedContent()
-
-            # Format content
-            if config.get('extract_headers', True):
-                result.text = f"""From: {headers['from']}
-To: {headers['to']}
-Subject: {headers['subject']}
-Date: {headers['date']}
-
----
-
-{body}"""
-            else:
-                result.text = body
-
-            result.metadata = {
-                'email_headers': headers,
-                'source_file': item.name,
-                'extractor': 'email'
-            }
-
-            return result
-
-
-# ============================================================================
-# IMAGE EXTRACTOR
-# ============================================================================
-
-class ImageExtractor(BaseExtractor):
-    """Extract image content (for OCR in later stage)"""
-
-    def __init__(self):
-        super().__init__('image/png', 'Image')
-
-    def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
-        """Extract image - text extraction happens in OCR stage"""
-        from PIL import Image
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = item.download(local_path=temp_dir)
-
-            # Get image dimensions
-            img = Image.open(file_path)
-            width, height = img.size
-            img_format = img.format
-
-            result = ExtractedContent()
-            result.images = [ImageContent(
-                path=file_path,
-                format=img_format.lower() if img_format else None,
-                size=(width, height)
-            )]
-
-            result.metadata = {
-                'source_file': item.name,
-                'requires_ocr': True,
-                'image_size': (width, height),
-                'format': img_format,
-                'extractor': 'image'
-            }
-
-            return result
-
-
-# ============================================================================
 # REGISTRY
 # ============================================================================
 
 EXTRACTOR_REGISTRY = {
-    # Text formats
-    'text/plain': TextExtractor,
-    'text/markdown': TextExtractor,
-    'text/csv': TextExtractor,
-
     # PDF
     'application/pdf': PDFExtractor,
-
-    # HTML
-    'text/html': HTMLExtractor,
-
     # Google Docs / Word
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DocsExtractor,
     'application/vnd.google-apps.document': DocsExtractor,
-
-    # Email
-    'message/rfc822': EmailExtractor,
-
-    # Images
-    'image/png': ImageExtractor,
-    'image/jpeg': ImageExtractor,
-    'image/jpg': ImageExtractor,
 }
 
 
@@ -640,10 +408,7 @@ def get_extractor(mime_type: str) -> BaseExtractor:
     extractor_class = EXTRACTOR_REGISTRY.get(mime_type)
 
     if not extractor_class:
-        raise ValueError(
-            f"Unsupported MIME type: {mime_type}\n"
-            f"Supported types: {list(EXTRACTOR_REGISTRY.keys())}"
-        )
+        raise ValueError(f"Unsupported MIME type: {mime_type}\n" f"Supported types: {list(EXTRACTOR_REGISTRY.keys())}")
 
     return extractor_class()
 

@@ -1,424 +1,308 @@
-# RAG Multimodal Processors
+# RAG Document Processors
 
-A flexible, composable system for processing multimodal documents (PDF, HTML, images, text, etc.) and extracting chunked content for Retrieval-Augmented Generation (RAG) workflows.
+Dataloop-based processors for converting **PDF and DOC files** into RAG-ready chunks. Each file type has its own app that uses shared utilities for extraction, processing, and upload.
 
-## 🎯 Overview
+## Supported File Types
 
-**Modular document processing with support for:**
+- **PDF** (.pdf) - Text extraction with optional OCR
+- **Microsoft Word** (.docx) - Document processing
 
-- **Multiple file types**: PDF, HTML, .docx, text, images, email
-- **Multimodal extraction**: Text, images, tables from documents
-- **Flexible processing**: OCR, LLM-based chunking, semantic analysis
-- **Simple composition**: Nested function calls for custom workflows
-- **Dataloop native**: Direct integration with Dataloop items and models
-
-## 🚀 Quick Start
-
-### Basic Usage
+## Quick Start
 
 ```python
 import dtlpy as dl
-from main import process_pdf
+from main import process_pdf, process_doc
 
-# Get item and dataset
+# Get items
 item = dl.items.get(item_id='your-item-id')
 dataset = dl.datasets.get(dataset_id='your-dataset-id')
 
-# Process with a built-in level
-result = process_pdf(item, dataset, level='basic')
-print(f"Created {len(result)} chunks")
+# Process PDF
+chunks = process_pdf(item, dataset)
+print(f"Created {len(chunks)} chunks")
+
+# Process DOC with OCR
+chunks = process_pdf(item, dataset, use_ocr=True, max_chunk_size=500)
+
+# Process DOCX
+chunks = process_doc(item, dataset, max_chunk_size=1000)
 ```
 
-### Processing Levels
+## Processing Options
 
-Four built-in processing levels:
+### Basic Processing
+
+Simple text extraction and chunking:
 
 ```python
-# 1. Basic: Clean → Chunk → Upload
-result = process_pdf(item, dataset, level='basic')
-
-# 2. OCR: OCR → Clean → Chunk → Upload
-result = process_pdf(item, dataset, level='ocr', use_ocr=True)
-
-# 3. LLM: Clean → LLM Semantic Chunk → Upload
-result = process_pdf(item, dataset, level='llm', llm_model_id='...')
-
-# 4. Advanced: OCR → Image Descriptions → LLM Chunk → Upload
-result = process_pdf(item, dataset, level='advanced',
-                    use_ocr=True,
-                    llm_model_id='...',
-                    vision_model_id='...')
+chunks = process_pdf(item, dataset)
 ```
 
-### Custom Processing
+Pipeline: Extract → Clean → Chunk → Upload
+
+### OCR for Scanned Documents
+
+Extract text from images in PDFs:
 
 ```python
-from main import process_custom
-import stages
-
-# Define custom workflow
-custom_workflow = [
-    stages.ocr_enhance,
-    stages.clean_text,
-    stages.chunk_by_sentence,
-    stages.upload_to_dataloop
-]
-
-result = process_custom(item, dataset, custom_workflow, {'use_ocr': True})
+chunks = process_pdf(item, dataset, use_ocr=True)
 ```
 
-## 🏗️ Architecture
+Pipeline: Extract → OCR → Clean → Chunk → Upload
 
-```
-┌─────────────────────────────────────┐
-│         Main API (main.py)          │
-│  process_pdf(), process_docs(), etc.│
-└──────────────┬──────────────────────┘
-               │
-       ┌───────┴────────┐
-       ▼                ▼
-┌────────────┐   ┌─────────────┐
-│ Extractors │   │Processing   │
-│(File Types)│   │Levels       │
-└─────┬──────┘   └──────┬──────┘
-      │                 │
-      └────────┬────────┘
-               ▼
-       ┌──────────────┐
-       │    Stages    │
-       │(Nested Calls)│
-       └──────┬───────┘
-              ▼
-       ┌──────────────┐
-       │   Dataloop   │
-       └──────────────┘
-```
+### Custom Chunk Size
 
-### Key Components
-
-1. **Extractors** (`extractors.py`) - Extract content from file types (PDF, HTML, .docx, text, images, email)
-2. **Stages** (`stages/`) - Processing operations (clean, chunk, OCR, LLM, upload)
-3. **Main API** (`main.py`) - Orchestration with 4 built-in levels + custom processing
-
-## 📦 Core Components
-
-### Extractors
-
-Extract multimodal content from files:
+Control how text is split:
 
 ```python
-from extractors import get_extractor
-
-extractor = get_extractor('application/pdf')
-content = extractor.extract(item, config)
-
-# Returns: text, images, tables, metadata
+chunks = process_pdf(
+    item, dataset,
+    max_chunk_size=500,      # Larger chunks
+    chunk_overlap=50         # More overlap between chunks
+)
 ```
 
-**Supported File Types**:
-- Text: `.txt`, `.md`, `.csv`
-- PDF: `.pdf` (with images)
-- HTML: `.html`, `.htm`
-- Docs: `.docx` (Google Docs)
-- Email: `.eml`
-- Images: `.png`, `.jpg`, `.jpeg`
+### Semantic Chunking
 
-### Stages
-
-Processing functions with signature: `(data: dict, config: dict) -> dict`
+Use LLM to chunk by meaning instead of size:
 
 ```python
-import stages
-
-# Preprocessing
-stages.clean_text
-stages.normalize_whitespace
-
-# Chunking
-stages.chunk_recursive
-stages.chunk_by_sentence
-stages.chunk_by_paragraph
-
-# OCR
-stages.ocr_enhance
-stages.describe_images_with_dataloop
-
-# LLM
-stages.llm_chunk_semantic
-stages.llm_summarize
-stages.llm_translate
-
-# Upload
-stages.upload_to_dataloop
-stages.upload_with_images
+chunks = process_pdf(
+    item, dataset,
+    chunking_strategy='semantic',
+    llm_model_id='your-model-id'
+)
 ```
 
-### Processing Levels
-
-Built-in workflows using nested function calls:
+### Different Chunking Strategies
 
 ```python
-def basic_processing(data, config):
-    """Clean → Chunk → Upload"""
-    data = stages.clean_text(data, config)
-    data = stages.normalize_whitespace(data, config)
-    data = stages.chunk_recursive(data, config)
-    data = stages.upload_to_dataloop(data, config)
-    return data
-```
+# Recursive (default) - Smart splitting on paragraphs, sentences, then characters
+chunks = process_pdf(item, dataset, chunking_strategy='recursive')
 
-## 🔧 Custom Processing
+# Sentence-based - Split on sentence boundaries
+chunks = process_pdf(item, dataset, chunking_strategy='sentence')
 
-### Option 1: Custom Workflow
+# Paragraph-based - Split on paragraph boundaries
+chunks = process_pdf(item, dataset, chunking_strategy='paragraph')
 
-```python
-from main import process_custom
-import stages
-
-workflow = [
-    stages.ocr_enhance,
-    stages.clean_text,
-    stages.llm_chunk_semantic,
-    stages.upload_with_images
-]
-
-result = process_custom(item, dataset, workflow, {
-    'use_ocr': True,
-    'llm_model_id': 'your-model-id'
-})
-```
-
-### Option 2: Register Custom Level
-
-```python
-from main import register_processing_level
-import stages
-
-def translation_level(data, config):
-    data = stages.clean_text(data, config)
-    data = stages.llm_translate(data, config)
-    data = stages.chunk_recursive(data, config)
-    data = stages.upload_to_dataloop(data, config)
-    return data
-
-# Register
-register_processing_level('translate', translation_level)
-
-# Use
-result = process_pdf(item, dataset, level='translate',
-                    llm_model_id='...', target_language='Spanish')
-```
-
-### Option 3: Custom Stage
-
-```python
-def my_stage(data, config):
-    """Custom processing stage"""
-    data['content'] = transform(data['content'])
-    return data
-
-# Use in workflow
-workflow = [stages.clean_text, my_stage, stages.upload_to_dataloop]
-result = process_custom(item, dataset, workflow)
-```
-
-## ⚙️ Configuration
-
-```python
-config = {
-    # Chunking
-    'max_chunk_size': 300,
-    'chunk_overlap': 20,
-
-    # OCR
-    'use_ocr': True,
-    'ocr_integration_method': 'append',  # or 'prepend', 'separate'
-
-    # LLM
-    'llm_model_id': 'your-dataloop-model-id',
-    'vision_model_id': 'your-vision-model-id',
-    'generate_summary': True,
-
-    # Extraction
-    'extract_images': True,
-    'extract_tables': False,
-    'use_markdown_extraction': False,  # For PDFs
-
-    # Upload
-    'upload_images': False,
-}
-```
-
-## 🧪 Examples
-
-### Basic PDF Processing
-
-```python
-from main import process_pdf
-
-result = process_pdf(item, dataset, level='basic',
-                    max_chunk_size=500, chunk_overlap=50)
-```
-
-### PDF with OCR
-
-```python
-result = process_pdf(item, dataset, level='ocr',
-                    use_ocr=True, ocr_integration_method='append')
-```
-
-### LLM Semantic Chunking
-
-```python
-result = process_pdf(item, dataset, level='llm',
-                    llm_model_id='your-model-id')
-```
-
-### Full Multimodal
-
-```python
-result = process_pdf(item, dataset, level='advanced',
-                    use_ocr=True,
-                    llm_model_id='your-llm-model',
-                    vision_model_id='your-vision-model',
-                    generate_summary=True,
-                    upload_images=True)
-```
-
-### Translation Workflow
-
-```python
-from main import process_custom
-import stages
-
-workflow = [
-    stages.clean_text,
-    stages.llm_translate,
-    stages.chunk_recursive,
-    stages.upload_to_dataloop
-]
-
-result = process_custom(item, dataset, workflow, {
-    'llm_model_id': 'your-model-id',
-    'translate': True,
-    'target_language': 'Spanish'
-})
+# Semantic - Use LLM to identify semantic boundaries
+chunks = process_pdf(
+    item, dataset,
+    chunking_strategy='semantic',
+    llm_model_id='your-model-id'
+)
 ```
 
 ### Batch Processing
+
+Process multiple files at once:
 
 ```python
 from main import process_batch
 
 items = dataset.items.list()
-results = process_batch(items, target_dataset, 'ocr',
-                       config={'use_ocr': True}, verbose=True)
+results = process_batch(
+    items=items,
+    target_dataset=chunks_dataset,
+    config={'use_ocr': True, 'max_chunk_size': 500}
+)
+
+# results is a dict: {item_id: [uploaded_chunks]}
+for item_id, chunks in results.items():
+    print(f"{item_id}: {len(chunks)} chunks")
 ```
 
-## 🔌 Extending the System
+### Debug Mode
 
-### Add New File Type
-
-Add to `extractors.py`:
+Enable detailed logging:
 
 ```python
-class AudioExtractor(BaseExtractor):
+chunks = process_pdf(item, dataset, log_level='DEBUG')
+```
+
+## Configuration
+
+All configuration options are passed as keyword arguments:
+
+```python
+chunks = process_pdf(
+    item=pdf_item,
+    target_dataset=dataset,
+
+    # Chunking options
+    max_chunk_size=300,              # Maximum chunk size (100-10000)
+    chunk_overlap=20,                # Overlap between chunks (0-500)
+    chunking_strategy='recursive',   # 'recursive', 'semantic', 'sentence', 'paragraph'
+
+    # OCR options (PDF only)
+    use_ocr=True,                    # Apply OCR to images
+    ocr_method='append_to_page',     # How to integrate OCR text
+
+    # LLM options
+    llm_model_id='your-model-id',    # Required for semantic chunking
+
+    # Logging
+    log_level='INFO'                 # 'DEBUG', 'INFO', 'WARNING', 'ERROR'
+)
+```
+
+### Configuration Reference
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `max_chunk_size` | int | 300 | Maximum characters per chunk (100-10000) |
+| `chunk_overlap` | int | 20 | Characters to overlap between chunks (0-500) |
+| `chunking_strategy` | str | 'recursive' | Strategy: 'recursive', 'semantic', 'sentence', 'paragraph' |
+| `use_ocr` | bool | False | Apply OCR to extract text from images (PDF only) |
+| `ocr_method` | str | 'append_to_page' | How to integrate OCR: 'append_to_page', 'separate_chunks', 'combine_all' |
+| `llm_model_id` | str | None | Dataloop model ID (required for semantic chunking) |
+| `log_level` | str | 'INFO' | Logging level: 'DEBUG', 'INFO', 'WARNING', 'ERROR' |
+
+## Testing
+
+Tests use real Dataloop items. Edit `tests/test_config.py` with your item IDs:
+
+```python
+# In tests/test_config.py
+TEST_ITEMS = {
+    'pdf': {'item_id': 'your-pdf-item-id'},
+    'dataset': {'dataset_id': 'your-dataset-id'},
+}
+```
+
+Then run:
+
+```bash
+python tests/test_pdf.py       # Test PDF processing
+python tests/test_doc.py       # Test .docx processing
+```
+
+See [tests/README.md](tests/README.md) for details.
+
+## Extension
+
+### Add a New File Type
+
+To add support for a new file type (e.g., Excel):
+
+**1. Create Extractor** in `extractors.py`:
+```python
+class XLSExtractor(BaseExtractor):
     def __init__(self):
-        super().__init__('audio/mpeg', 'Audio')
+        super().__init__('application/vnd.ms-excel', 'XLS')
 
     def extract(self, item, config):
-        # Extraction logic
-        result = ExtractedContent()
-        result.text = "..."
-        return result
+        # Your extraction logic
+        return ExtractedContent(text=extracted_text)
 
-# Register
-EXTRACTOR_REGISTRY['audio/mpeg'] = AudioExtractor
+# Register the extractor
+EXTRACTOR_REGISTRY['application/vnd.ms-excel'] = XLSExtractor
 ```
 
-### Add New Stage
-
-Create in `stages/`:
-
+**2. Create App** in `apps/xls-processor/xls_app.py`:
 ```python
-def my_stage(data, config):
-    """My processing logic"""
-    data['content'] = process(data['content'])
-    return data
-```
-
-Export from `stages/__init__.py` and use immediately.
-
-### Add New Level
-
-```python
-from main import register_processing_level
+import logging
+from typing import Dict, Any, List
+import dtlpy as dl
+from extractors import XLSExtractor
 import stages
 
-def my_level(data, config):
-    data = stages.stage1(data, config)
-    data = stages.stage2(data, config)
-    return data
+class XLSApp:
+    def __init__(self, item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any] = None):
+        self.item = item
+        self.target_dataset = target_dataset
+        self.config = config or {}
+        self.extractor = XLSExtractor()
+        self.logger = logging.getLogger(f"XLSApp.{item.id[:8]}")
 
-register_processing_level('my_level', my_level)
+    def extract(self, data):
+        extracted = self.extractor.extract(self.item, self.config)
+        data.update(extracted.to_dict())
+        return data
+
+    def clean(self, data):
+        data = stages.clean_text(data, self.config)
+        return data
+
+    def chunk(self, data):
+        data = stages.chunk_recursive(data, self.config)
+        return data
+
+    def upload(self, data):
+        data = stages.upload_to_dataloop(data, self.config)
+        return data
+
+    def run(self):
+        data = {'item': self.item, 'target_dataset': self.target_dataset}
+        data = self.extract(data)
+        data = self.clean(data)
+        data = self.chunk(data)
+        data = self.upload(data)
+        return data.get('uploaded_items', [])
 ```
 
-## 📊 Supported File Types
+**3. Register App** in `main.py`:
+```python
+from xls_app import XLSApp
 
-| File Type | Extractor | Features |
-|-----------|-----------|----------|
-| Text (.txt, .md, .csv) | TextExtractor | Encoding detection, CSV structure |
-| PDF | PDFExtractor | Text + images + OCR + markdown |
-| HTML | HTMLExtractor | Text + images + tables |
-| Word/Docs (.docx) | DocsExtractor | Text + images + tables |
-| Email (.eml) | EmailExtractor | Headers + body |
-| Images (.png, .jpg) | ImageExtractor | OCR processing |
+APP_REGISTRY['application/vnd.ms-excel'] = XLSApp
+```
 
-## 📚 Documentation
+### Add a Custom Processing Stage
 
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Quick reference guide
-- **[SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md)** - Detailed architecture
+**1. Create Stage** in `stages/custom.py`:
+```python
+def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Custom processing logic."""
+    content = data.get('content', '')
+    # Transform content
+    data['content'] = transformed_content
+    return data
+```
+
+**2. Export** from `stages/__init__.py`:
+```python
+from .custom import my_custom_stage
+__all__ = [..., 'my_custom_stage']
+```
+
+**3. Use in App**:
+```python
+# In your app's run() method
+def run(self):
+    data = self.extract(data)
+    data = stages.my_custom_stage(data, self.config)  # Use your custom stage
+    data = self.chunk(data)
+    data = self.upload(data)
+    return data.get('uploaded_items', [])
+```
+
+## Architecture
+
+The system uses an **app-based architecture**:
+
+```
+apps/
+├── pdf-processor/
+│   └── pdf_app.py          # PDFApp - handles PDF processing
+└── doc-processor/
+    └── doc_app.py          # DOCApp - handles DOCX processing
+
+extractors.py               # Extracts content from files (PDF, DOC only)
+stages/                     # Shared processing utilities
+main.py                     # Routes requests to appropriate app
+```
+
+Each app is self-contained and imports shared utilities (`extractors`, `stages`) as needed.
+
+## Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture details
 - **[CLAUDE.md](CLAUDE.md)** - Development guide for Claude Code
+- **[tests/README.md](tests/README.md)** - Testing guide
 
-## 🔗 Links
+## Links
 
 - [Dataloop Platform](https://dataloop.ai)
-- [Dataloop SDK Documentation](https://sdk-docs.dataloop.ai)
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-python -m pytest tests/
-
-# Run with verbose output
-python -m pytest tests/ -v
-```
-
-## 🤝 Contributing
-
-```bash
-# Clone and setup
-git clone <repository-url>
-cd rag-multimodal-processors
-pip install -r requirements.txt
-
-# Run tests
-python -m pytest tests/
-```
-
-**Code Style**:
-- Stage signature: `(data: dict, config: dict) -> dict`
-- Use type hints
-- Add docstrings
-- Write tests
-
-## 📄 License
-
-MIT License
-
-## 🆘 Support
-
-- Create an issue in the repository
-- Check [documentation](architecture/)
-- Review [examples](#-examples)
+- [Dataloop SDK](https://sdk-docs.dataloop.ai)

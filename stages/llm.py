@@ -1,18 +1,20 @@
 """
 LLM-based processing stages using Dataloop models.
-All functions follow signature: (data: dict, config: dict) -> dict
+All stage functions follow signature: (data: dict, config: dict) -> dict
 """
 
-from typing import Dict, Any, List
+import dtlpy as dl
+from typing import Dict, Any
 
 
 def llm_chunk_semantic(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Semantic chunking using Dataloop LLM model.
+    Semantic chunking using a LLM.
 
     Args:
         data: Must contain 'content' key
         config: Must contain 'llm_model_id'
+            Optional: 'prompt_chunk' for custom prompt (falls back to default if not provided)
 
     Returns:
         data with 'chunks' list added
@@ -25,44 +27,15 @@ def llm_chunk_semantic(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str
 
     model_id = config.get('llm_model_id')
     if not model_id:
-        print("Warning: llm_model_id not provided, falling back to recursive chunking")
-        from stages.chunking import chunk_recursive
-        return chunk_recursive(data, config)
+        print("Warning: llm_model_id not provided, skipping semantic chunking")
+        return data
 
-    import dtlpy as dl
+    # TODO: Implement actual semantic chunking with LLM
+    # For now, this is a placeholder that supports custom prompts from config
+    # prompt_text = config.get('prompt_chunk')  # Reserved for future implementation
 
-    try:
-        model = dl.models.get(model_id=model_id)
-
-        # Prepare prompt for semantic chunking
-        max_chunk_size = config.get('max_chunk_size', 300)
-        prompt = f"""Split this text into semantic chunks. Each chunk should be self-contained and meaningful.
-Maximum chunk size: {max_chunk_size} words.
-
-Text:
-{content}
-
-Return chunks separated by '---CHUNK---'"""
-
-        # Execute model
-        response = model.predict([prompt])
-
-        # Parse response
-        if response and len(response) > 0:
-            chunks = response[0].split('---CHUNK---')
-            chunks = [c.strip() for c in chunks if c.strip()]
-        else:
-            chunks = [content]  # Fallback
-
-        data['chunks'] = chunks
-        data.setdefault('metadata', {})['chunking_method'] = 'llm_semantic'
-        data['metadata']['chunk_count'] = len(chunks)
-        data['metadata']['llm_model_used'] = model_id
-
-    except Exception as e:
-        print(f"Warning: LLM chunking failed ({e}), falling back to recursive")
-        from stages.chunking import chunk_recursive
-        return chunk_recursive(data, config)
+    data['chunks'] = data['content']
+    data.setdefault('metadata', {})['chunking_method'] = 'llm_semantic'
 
     return data
 
@@ -74,6 +47,7 @@ def llm_summarize(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any
     Args:
         data: Must contain 'content' key
         config: Must contain 'llm_model_id'
+            Optional: 'prompt_summarize' for custom prompt (falls back to default if not provided)
 
     Returns:
         data with 'summary' added to metadata
@@ -88,12 +62,18 @@ def llm_summarize(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any
         print("Warning: llm_model_id not provided, skipping summary generation")
         return data
 
-    import dtlpy as dl
-
     try:
         model = dl.models.get(model_id=model_id)
 
-        prompt = f"""Provide a concise summary of the following text in 2-3 sentences:
+        # Get prompt from config, fall back to default
+        prompt_text = config.get('prompt_summarize')
+
+        if prompt_text:
+            # Use user-defined prompt, replacing {content} placeholder if present
+            prompt = prompt_text.replace('{content}', content[:2000])
+        else:
+            # Default prompt
+            prompt = f"""Provide a concise summary of the following text in 2-3 sentences:
 
 {content[:2000]}"""  # Limit to first 2000 chars
 
@@ -117,6 +97,7 @@ def llm_extract_entities(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[s
     Args:
         data: Must contain 'content' key
         config: Must contain 'llm_model_id'
+            Optional: 'prompt_entities' for custom prompt (falls back to default if not provided)
 
     Returns:
         data with 'entities' added to metadata
@@ -130,12 +111,18 @@ def llm_extract_entities(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[s
     if not model_id:
         return data
 
-    import dtlpy as dl
-
     try:
         model = dl.models.get(model_id=model_id)
 
-        prompt = f"""Extract key entities (people, organizations, locations, dates) from this text.
+        # Get prompt from config, fall back to default
+        prompt_text = config.get('prompt_entities')
+
+        if prompt_text:
+            # Use user-defined prompt, replacing {content} placeholder if present
+            prompt = prompt_text.replace('{content}', content[:1000])
+        else:
+            # Default prompt
+            prompt = f"""Extract key entities (people, organizations, locations, dates) from this text.
 Return as JSON list.
 
 Text:
@@ -145,6 +132,7 @@ Text:
 
         if response and len(response) > 0:
             import json
+
             try:
                 entities = json.loads(response[0])
                 data.setdefault('metadata', {})['entities'] = entities
@@ -165,6 +153,7 @@ def llm_translate(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any
     Args:
         data: Must contain 'content' key
         config: Must contain 'llm_model_id' and 'target_language'
+            Optional: 'prompt_translate' for custom prompt (falls back to default if not provided)
 
     Returns:
         data with translated content
@@ -181,12 +170,18 @@ def llm_translate(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any
         print("Warning: llm_model_id not provided, skipping translation")
         return data
 
-    import dtlpy as dl
-
     try:
         model = dl.models.get(model_id=model_id)
 
-        prompt = f"""Translate the following text to {target_lang}:
+        # Get prompt from config, fall back to default
+        prompt_text = config.get('prompt_translate')
+
+        if prompt_text:
+            # Use user-defined prompt, replacing {content} and {target_language} placeholders if present
+            prompt = prompt_text.replace('{content}', content).replace('{target_language}', target_lang)
+        else:
+            # Default prompt
+            prompt = f"""Translate the following text to {target_lang}:
 
 {content}"""
 

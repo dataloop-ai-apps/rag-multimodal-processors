@@ -146,6 +146,201 @@ def upload_chunks(chunks: List[str],
     return uploaded_items
 
 
+def upload_images(
+    images: List[Any],
+    original_item: dl.Item,
+    target_dataset: dl.Dataset,
+    remote_path: str = '/images'
+) -> List[dl.Item]:
+    """
+    Upload extracted images to Dataloop dataset with proper metadata.
+    
+    Args:
+        images: List of image objects (dict or ImageContent) with 'path' attribute
+        original_item: Original document item
+        target_dataset: Target dataset for images
+        remote_path: Remote path in dataset for images
+        
+    Returns:
+        List[dl.Item]: Uploaded image items
+        
+    TODO: Add tests for:
+        - Uploading images from PDF extraction
+        - Handling missing image paths
+        - Image metadata creation
+        - Batch vs individual uploads
+    """
+    logger.info(
+        f"Uploading images | item_id={original_item.id} count={len(images)} "
+        f"remote_path={remote_path} target_dataset={target_dataset.name}"
+    )
+    
+    if not images:
+        logger.warning("No images to upload")
+        return []
+    
+    uploaded_items = []
+    image_paths = []
+    image_metadata_list = []
+    
+    base_name = Path(original_item.name).stem
+    
+    for idx, img in enumerate(images):
+        # Extract path from dict or ImageContent object
+        if isinstance(img, dict):
+            img_path = img.get('path')
+            img_page = img.get('page_number')
+            img_format = img.get('format', 'png')
+        else:
+            img_path = getattr(img, 'path', None)
+            img_page = getattr(img, 'page_number', None)
+            img_format = getattr(img, 'format', 'png') or 'png'
+        
+        if not img_path or not os.path.exists(img_path):
+            logger.warning(f"Image path missing or file not found: {img_path}")
+            continue
+        
+        # Create filename
+        if img_page is not None:
+            img_filename = f"{base_name}_page{img_page}_img{idx:03d}.{img_format}"
+        else:
+            img_filename = f"{base_name}_img{idx:03d}.{img_format}"
+        
+        image_paths.append(img_path)
+        
+        # Create metadata for image
+        img_metadata = {
+            'user': {
+                'original_item_id': original_item.id,
+                'original_item_name': original_item.name,
+                'image_index': idx,
+                'page_number': img_page,
+                'format': img_format,
+                'extracted_image': True,
+                'source_document': original_item.name
+            }
+        }
+        
+        # Add size if available
+        if isinstance(img, dict):
+            if img.get('size'):
+                img_metadata['user']['width'] = img['size'][0] if isinstance(img['size'], (list, tuple)) else None
+                img_metadata['user']['height'] = img['size'][1] if isinstance(img['size'], (list, tuple)) else None
+            # Add bounding box (positional metadata)
+            if img.get('bbox'):
+                bbox = img['bbox']
+                img_metadata['user']['bbox'] = bbox
+                img_metadata['user']['x'] = bbox[0] if len(bbox) > 0 else None
+                img_metadata['user']['y'] = bbox[1] if len(bbox) > 1 else None
+                img_metadata['user']['bbox_width'] = bbox[2] if len(bbox) > 2 else None
+                img_metadata['user']['bbox_height'] = bbox[3] if len(bbox) > 3 else None
+        elif hasattr(img, 'size') and img.size:
+            img_metadata['user']['width'] = img.size[0] if isinstance(img.size, (list, tuple)) else None
+            img_metadata['user']['height'] = img.size[1] if isinstance(img.size, (list, tuple)) else None
+            # Add bounding box (positional metadata)
+            if hasattr(img, 'bbox') and img.bbox:
+                bbox = img.bbox
+                img_metadata['user']['bbox'] = bbox
+                img_metadata['user']['x'] = bbox[0] if len(bbox) > 0 else None
+                img_metadata['user']['y'] = bbox[1] if len(bbox) > 1 else None
+                img_metadata['user']['bbox_width'] = bbox[2] if len(bbox) > 2 else None
+                img_metadata['user']['bbox_height'] = bbox[3] if len(bbox) > 3 else None
+        
+        image_metadata_list.append(img_metadata)
+    
+    if not image_paths:
+        logger.warning("No valid image paths to upload")
+        return []
+    
+    # Check if all metadata dictionaries are identical
+    # Dataloop only supports batch upload with a single metadata dict (applied to all items)
+    def _metadata_are_identical(metadata_list):
+        """Check if all metadata dictionaries are identical."""
+        if not metadata_list:
+            return True
+        if len(metadata_list) == 1:
+            return True
+        # Compare all metadata dicts to the first one
+        first_metadata = metadata_list[0]
+        for metadata in metadata_list[1:]:
+            if metadata != first_metadata:
+                return False
+        return True
+    
+    full_remote_path = os.path.join(remote_path, original_item.dir.lstrip('/')).replace('\\', '/')
+    
+    # Use batch upload only if all metadata is identical
+    if _metadata_are_identical(image_metadata_list):
+        logger.info("All images have identical metadata, using batch upload")
+        try:
+            # Use single metadata dict for batch upload (applied to all items)
+            common_metadata = image_metadata_list[0] if image_metadata_list else {}
+            uploaded_items = target_dataset.items.upload(
+                local_path=image_paths,
+                remote_path=full_remote_path,
+                item_metadata=common_metadata,
+                overwrite=True,
+                raise_on_error=False
+            )
+            
+            # Handle single item vs list response
+            if uploaded_items is None:
+                logger.error("Image upload returned None")
+                uploaded_items = []
+            elif isinstance(uploaded_items, dl.Item):
+                uploaded_items = [uploaded_items]
+            else:
+                uploaded_items = [item for item in uploaded_items]
+            
+            logger.info(
+                f"Batch image upload completed | item_id={original_item.id} "
+                f"uploaded_count={len(uploaded_items)} remote_path={full_remote_path}"
+            )
+        except Exception as e:
+            logger.error(f"Batch image upload failed: {e}, falling back to individual uploads")
+            uploaded_items = []
+            
+            # Fallback to individual uploads
+            for img_path, img_metadata in zip(image_paths, image_metadata_list):
+                try:
+                    uploaded_item = target_dataset.items.upload(
+                        local_path=img_path,
+                        remote_path=full_remote_path,
+                        item_metadata=img_metadata,
+                        overwrite=True
+                    )
+                    uploaded_items.append(uploaded_item)
+                except Exception as upload_err:
+                    logger.warning(f"Failed to upload image {img_path}: {upload_err}")
+                    continue
+            
+            logger.info(f"Individual image uploads completed | uploaded={len(uploaded_items)} images")
+    else:
+        # Metadata differs per image, use individual uploads directly
+        logger.info("Images have different metadata, using individual uploads")
+        uploaded_items = []
+        
+        for img_path, img_metadata in zip(image_paths, image_metadata_list):
+            try:
+                uploaded_item = target_dataset.items.upload(
+                    local_path=img_path,
+                    remote_path=full_remote_path,
+                    item_metadata=img_metadata,
+                    overwrite=True
+                )
+                uploaded_items.append(uploaded_item)
+            except Exception as upload_err:
+                logger.warning(f"Failed to upload image {img_path}: {upload_err}")
+                continue
+        
+        logger.info(
+            f"Individual image uploads completed | item_id={original_item.id} "
+            f"uploaded_count={len(uploaded_items)} remote_path={full_remote_path}"
+        )
+    
+    return uploaded_items
+
+
 def cleanup_temp_items_and_folder(
     items: List[dl.Item],
     folder_path: str,

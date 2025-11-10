@@ -1,8 +1,0 @@
----
-alwaysApply: true
----
-
-Enforce style guide across the project:
-- Python 3.10+, use type hints
-- Follow ESLint + Ruff + Black
-- Write tests for all non-trivial logic
