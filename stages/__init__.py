@@ -7,16 +7,14 @@ This consistent signature enables piping and makes stages composable.
 
 from .preprocessing import clean_text, normalize_whitespace, remove_empty_lines
 from .chunking import (
-    chunk_recursive,
-    chunk_by_sentence,
-    chunk_by_paragraph,
-    no_chunking,
+    chunk_text,
     chunk_recursive_with_images,
     chunk_with_embedded_images,
+    TextChunker,
 )
 from .ocr import ocr_enhance, describe_images_with_dataloop
 from .llm import llm_chunk_semantic, llm_summarize
-from .upload import upload_to_dataloop, upload_with_images
+from .upload import upload_to_dataloop
 
 __all__ = [
     # Preprocessing
@@ -24,12 +22,10 @@ __all__ = [
     'normalize_whitespace',
     'remove_empty_lines',
     # Chunking
-    'chunk_recursive',
+    'chunk_text',
     'chunk_recursive_with_images',
     'chunk_with_embedded_images',
-    'chunk_by_sentence',
-    'chunk_by_paragraph',
-    'no_chunking',
+    'TextChunker',
     # OCR
     'ocr_enhance',
     'describe_images_with_dataloop',
@@ -38,5 +34,4 @@ __all__ = [
     'llm_summarize',
     # Upload
     'upload_to_dataloop',
-    'upload_with_images',
 ]

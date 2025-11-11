@@ -136,8 +136,8 @@ chunks = process_pdf(
     chunking_strategy='recursive',   # 'recursive', 'semantic', 'sentence', 'paragraph'
 
     # OCR options (PDF only)
-    use_ocr=True,                    # Apply OCR to images
-    ocr_method='append_to_page',     # How to integrate OCR text
+    use_ocr=True,                        # Apply OCR to images
+    ocr_integration_method='per_page',   # How to integrate OCR text
 
     # LLM options
     llm_model_id='your-model-id',    # Required for semantic chunking
@@ -155,7 +155,7 @@ chunks = process_pdf(
 | `chunk_overlap` | int | 20 | Characters to overlap between chunks (0-500) |
 | `chunking_strategy` | str | 'recursive' | Strategy: 'recursive', 'semantic', 'sentence', 'paragraph' |
 | `use_ocr` | bool | False | Apply OCR to extract text from images (PDF only) |
-| `ocr_method` | str | 'append_to_page' | How to integrate OCR: 'append_to_page', 'separate_chunks', 'combine_all' |
+| `ocr_integration_method` | str | 'per_page' | How to integrate OCR: 'per_page' (interleave by page), 'append' (at end), 'prepend' (at start), 'separate' (separate field) |
 | `llm_model_id` | str | None | Dataloop model ID (required for semantic chunking) |
 | `log_level` | str | 'INFO' | Logging level: 'DEBUG', 'INFO', 'WARNING', 'ERROR' |
 
@@ -186,21 +186,30 @@ See [tests/README.md](tests/README.md) for details.
 
 To add support for a new file type (e.g., Excel):
 
-**1. Create Extractor** in `extractors.py`:
+**1. Create Extractor** in `extractors/xls_extractor.py`:
 ```python
-class XLSExtractor(BaseExtractor):
-    def __init__(self):
-        super().__init__('application/vnd.ms-excel', 'XLS')
+from .content_types import ExtractedContent
+import dtlpy as dl
+from typing import Dict, Any
 
-    def extract(self, item, config):
+class XLSExtractor:
+    def __init__(self):
+        self.mime_type = 'application/vnd.ms-excel'
+        self.name = 'XLS'
+
+    def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
         # Your extraction logic
         return ExtractedContent(text=extracted_text)
+```
 
-# Register the extractor
+Then register it in `extractors/registry.py`:
+```python
+from .xls_extractor import XLSExtractor
+
 EXTRACTOR_REGISTRY['application/vnd.ms-excel'] = XLSExtractor
 ```
 
-**2. Create App** in `apps/xls-processor/xls_app.py`:
+**2. Create App** in `apps/xls_processor/xls_processor.py`:
 ```python
 import logging
 from typing import Dict, Any, List
@@ -208,13 +217,14 @@ import dtlpy as dl
 from extractors import XLSExtractor
 import stages
 
-class XLSApp:
+class XLSProcessor(dl.BaseServiceRunner):
     def __init__(self, item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any] = None):
+        super().__init__()
         self.item = item
         self.target_dataset = target_dataset
         self.config = config or {}
         self.extractor = XLSExtractor()
-        self.logger = logging.getLogger(f"XLSApp.{item.id[:8]}")
+        self.logger = logging.getLogger(f"XLSProcessor.{item.id[:8]}")
 
     def extract(self, data):
         extracted = self.extractor.extract(self.item, self.config)
@@ -226,7 +236,7 @@ class XLSApp:
         return data
 
     def chunk(self, data):
-        data = stages.chunk_recursive(data, self.config)
+        data = stages.chunk_text(data, self.config)
         return data
 
     def upload(self, data):
@@ -242,11 +252,23 @@ class XLSApp:
         return data.get('uploaded_items', [])
 ```
 
-**3. Register App** in `main.py`:
+**3. Create Package Structure** `apps/xls_processor/__init__.py`:
 ```python
-from xls_app import XLSApp
+from .xls_processor import XLSProcessor
+__all__ = ['XLSProcessor']
+```
 
-APP_REGISTRY['application/vnd.ms-excel'] = XLSApp
+**4. Export from Apps Package** `apps/__init__.py`:
+```python
+from .xls_processor.xls_processor import XLSProcessor
+__all__ = [..., 'XLSProcessor']
+```
+
+**5. Register App** in `main.py`:
+```python
+from apps import PDFProcessor, DOCProcessor, XLSProcessor
+
+APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
 ```
 
 ### Add a Custom Processing Stage
@@ -280,26 +302,72 @@ def run(self):
 
 ## Architecture
 
-The system uses an **app-based architecture**:
+The system uses an **app-based architecture** with clean separation of concerns:
 
 ```
-apps/
-├── pdf-processor/
-│   └── pdf_app.py          # PDFApp - handles PDF processing
-└── doc-processor/
-    └── doc_app.py          # DOCApp - handles DOCX processing
+main.py                     # Entry point - routes to apps via registry
 
-extractors.py               # Extracts content from files (PDF, DOC only)
-stages/                     # Shared processing utilities
-main.py                     # Routes requests to appropriate app
+apps/                       # File-type processors (proper Python package)
+├── __init__.py            # Exports PDFProcessor, DOCProcessor
+├── pdf_processor/
+│   ├── __init__.py
+│   ├── pdf_processor.py   # PDFProcessor class
+│   ├── dataloop.json
+│   └── Dockerfile
+└── doc_processor/
+    ├── __init__.py
+    ├── doc_processor.py   # DOCProcessor class
+    ├── dataloop.json
+    └── Dockerfile
+
+extractors/                 # Content extraction package
+├── __init__.py
+├── content_types.py         # ExtractedContent, ImageContent, TableContent data models
+├── mixins.py              # DataloopModelMixin for model-based extractors
+├── pdf_extractor.py       # PDF extraction
+├── docs_extractor.py      # DOCX extraction
+├── ocr_extractor.py       # OCR extraction
+└── registry.py           # Extractor registry
+
+stages/                     # Pipeline interface layer
+├── __init__.py            # Signature: (data: dict, config: dict) -> dict
+├── chunking.py           # Chunking stages
+├── preprocessing.py       # Text cleaning stages
+├── ocr.py                # OCR stages
+├── llm.py                # LLM stages
+└── upload.py             # Upload stages
+
+utils/                       # Implementation layer
+├── __init__.py            # Reusable infrastructure utilities
+├── dataloop_helpers.py   # Upload/dataset helpers
+├── text_cleaning.py      # Deep text cleaning
+├── chunk_metadata.py     # Metadata models
+└── dataloop_model_executor.py  # Model execution
+
+tests/                      # All tests consolidated here
+├── test_pdf.py
+├── test_doc.py
+├── test_integration.py
+└── test_processors.py
 ```
 
-Each app is self-contained and imports shared utilities (`extractors`, `stages`) as needed.
+### Key Design Pattern: Stages vs Utils
+
+**Stages** (`stages/`) - Pipeline interface layer:
+- Uniform signature: `(data: dict, config: dict) -> dict`
+- Adapts utils functions to work in composable pipelines
+- Manages the shared data dictionary that flows through pipelines
+
+**Utils** (`utils/`) - Implementation layer:
+- Specific type signatures for reusable functions
+- Contains business logic and integrations
+- Can be used standalone outside of pipelines
+
+This **Adapter Pattern** provides flexibility, testability, and composability.
 
 ## Documentation
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture details
-- **[CLAUDE.md](CLAUDE.md)** - Development guide for Claude Code
 - **[tests/README.md](tests/README.md)** - Testing guide
 
 ## Links

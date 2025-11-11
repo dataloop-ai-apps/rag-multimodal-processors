@@ -12,16 +12,9 @@ Edit the values below to configure your test runs.
 # Each test type entry (pdf, doc, etc.) contains the item ID for that test
 
 TEST_ITEMS = {
-    "dataset": {'dataset_id': "6910ba261a0566b56d15a55a"},  # Shared target dataset for all test chunks
-    'pdf': {'item_id': "6911a710d4c1299c6780c14f"},  # PDF file item ID
-    'doc': {'item_id': "6910ba43732d419b5d98b41c"},  # DOC/DOCX file item ID
-    # Add more test types as needed:
-    # 'html': {
-    #     'item_id': "...",  # HTML file item ID
-    # },
-    # 'email': {
-    #     'item_id': "...",  # Email file item ID
-    # },
+    "dataset": {'dataset_id': "691344d0a235b51330ed5951"},  # Dataloop Demo 2025 - rag preprorcess testing
+    'pdf': {'item_id': "6913452e732d419b5da2dc9c"},  # PDF file item ID
+    'doc': {'item_id': "6913452dd4c1299c678a452a"},  # DOC/DOCX file item ID
 }
 
 
@@ -49,17 +42,20 @@ TARGET_DATASET_ID = TEST_ITEMS.get('dataset', {}).get('dataset_id', "dataset_id_
 # ============================================================
 
 PDF_CONFIG = {
+    'name': 'Test-PDF-Processor',
     # OCR Processing
-    'use_ocr': False,  # Set to True to enable OCR for scanned PDFs
-    'ocr_integration_method': 'append',  # Options: 'append', 'prepend', 'separate'
+    'ocr_from_images': True,  # Extract images and apply OCR (uses EasyOCR)
+    'ocr_integration_method': 'separate_chunks',  # Options: 'append_to_page', 'separate_chunks', 'combine_all'
     # Text Extraction
-    'use_markdown_extraction': False,  # Use markdown extraction for PDFs
-    'extract_images': True,
-    'extract_tables': True,
+    'use_markdown_extraction': False,
     # Chunking Strategy
-    'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed-size', 'sentence', 'paragraph', '1-chunk'
-    'max_chunk_size': 300,
+    'chunking_strategy': (
+        'recursive'
+    ),  # Options: 'recursive', 'fixed-size', 'nltk-sentence', 'nltk-paragraphs', '1-chunk'
+    'max_chunk_size': 500,
     'chunk_overlap': 20,
+    # Text Cleaning
+    'to_correct_spelling': True,
 }
 
 # ============================================================
@@ -67,11 +63,16 @@ PDF_CONFIG = {
 # ============================================================
 
 DOC_CONFIG = {
+    'name': 'Test-DOC-Processor',
     # Text Extraction
     'extract_images': True,
     'extract_tables': True,
     # Chunking Strategy
-    'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed-size', 'sentence', 'paragraph', '1-chunk'
-    'max_chunk_size': 300,
+    'chunking_strategy': (
+        'recursive'
+    ),  # Options: 'recursive', 'fixed-size', 'nltk-sentence', 'nltk-paragraphs', '1-chunk'
+    'max_chunk_size': 500,
     'chunk_overlap': 20,
+    # Text Cleaning
+    'to_correct_spelling': True,
 }

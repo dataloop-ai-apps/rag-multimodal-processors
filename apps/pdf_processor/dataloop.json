@@ -219,7 +219,7 @@
       {
         "name": "pdf-processor-module",
         "computeConfig": "pdf-processor-service",
-        "entryPoint": "apps/pdf-processor/pdf_processor.py",
+        "entryPoint": "apps/pdf_processor/pdf_processor.py",
         "className": "PDFProcessor",
         "initInputs": [],
         "functions": [

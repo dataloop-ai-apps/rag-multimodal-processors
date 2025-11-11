@@ -12,40 +12,52 @@ Each file type has its own **App** class that orchestrates extraction, processin
 
 ## Supported File Types
 
-- **PDF** (.pdf) - `PDFApp`
-- **DOC** (.docx) - `DOCApp`
+- **PDF** (.pdf) - `PDFProcessor`
+- **DOC** (.docx) - `DOCProcessor`
 
 ## Components
 
 ### 1. Apps (`apps/`)
 
-File-type specific processor classes. Each app:
+File-type specific processor classes organized as a **proper Python package**. Each app:
 - Imports and uses shared extractors and stages
 - Orchestrates the processing pipeline
-- Handles logging and error handling
+- Includes its own Dockerfile and Dataloop manifest
+- Can be deployed independently to Dataloop platform
 
 **Structure:**
 ```
 apps/
-├── pdf-processor/
-│   ├── pdf_app.py          # PDFApp class
-│   ├── dataloop.json       # Dataloop app config
-│   └── Dockerfile
-└── doc-processor/
-    ├── doc_app.py          # DOCApp class
+├── __init__.py                  # Package exports PDFProcessor, DOCProcessor
+├── pdf_processor/
+│   ├── __init__.py             # Sub-package exports
+│   ├── pdf_processor.py
+│   ├── dataloop.json
+│   ├── Dockerfile
+│   └── README.md
+└── doc_processor/
+    ├── __init__.py             # Sub-package exports
+    ├── doc_processor.py
     ├── dataloop.json
-    └── Dockerfile
+    ├── Dockerfile
+    └── README.md
+```
+
+**Importing:**
+```python
+# Clean imports - no sys.path manipulation needed
+from apps import PDFProcessor, DOCProcessor
 ```
 
 **Example App:**
 ```python
-class PDFApp:
+class PDFProcessor:
     def __init__(self, item: dl.Item, target_dataset: dl.Dataset, config: dict):
         self.item = item
         self.target_dataset = target_dataset
         self.config = config
         self.extractor = PDFExtractor()
-        self.logger = logging.getLogger(f"PDFApp.{item.id[:8]}")
+        self.logger = logging.getLogger(f"PDFProcessor.{item.id[:8]}")
 
     def extract(self, data: dict) -> dict:
         extracted = self.extractor.extract(self.item, self.config)
@@ -79,55 +91,138 @@ class PDFApp:
         return data.get('uploaded_items', [])
 ```
 
-### 2. Extractors (`extractors.py`)
+### 2. Extractors (`extractors/`)
 
-Extract multimodal content from files:
+Extract multimodal content from files. Organized as a package:
 
-```python
-@dataclass
-class ExtractedContent:
-    text: str
-    images: List[ImageContent]
-    tables: List[TableContent]
-    metadata: Dict[str, Any]
+```
+extractors/
+├── content_types.py     # ExtractedContent, ImageContent, TableContent data models
+├── mixins.py            # DataloopModelMixin for model-based extractors
+├── pdf_extractor.py     # PDFExtractor
+├── docs_extractor.py    # DocsExtractor
+├── ocr_extractor.py     # OCRExtractor
+└── registry.py          # EXTRACTOR_REGISTRY and registration functions
 ```
 
 **Available Extractors:**
 - `PDFExtractor` - Extract from PDF files
 - `DocsExtractor` - Extract from DOCX files
+- `OCRExtractor` - Extract text from images using OCR
+
+**Usage:**
+```python
+from extractors import PDFExtractor, ExtractedContent
+
+extractor = PDFExtractor()
+content = extractor.extract(item, config)
+```
 
 ### 3. Stages (`stages/`)
 
-Shared processing functions with signature: `(data: dict, config: dict) -> dict`
+**Pipeline interface layer** - Functions with standardized signature: `(data: dict, config: dict) -> dict`
 
+Stages provide a uniform interface for composable pipelines. They:
+- Extract parameters from the shared `data` dictionary
+- Call utils implementation functions to do the actual work
+- Put results back into the `data` dictionary
+- Enable clean pipeline composition in app classes
+
+**Available Stages:**
+- **chunking.py**: `chunk_text`, `chunk_recursive_with_images`, `chunk_with_embedded_images`, `TextChunker`
 - **preprocessing.py**: `clean_text`, `normalize_whitespace`, `remove_empty_lines`
-- **chunking.py**: `chunk_recursive`, `chunk_by_sentence`, `chunk_by_paragraph`
 - **ocr.py**: `ocr_enhance`, `describe_images_with_dataloop`
 - **llm.py**: `llm_chunk_semantic`, `llm_summarize`
 - **upload.py**: `upload_to_dataloop`, `upload_with_images`
 
-All stages are imported and used by apps.
+**Example Stage (Adapter Pattern):**
+```python
+# stages/upload.py
+def upload_to_dataloop(data: Dict, config: Dict) -> Dict:
+    """Pipeline interface - extracts from data dict, calls utils, returns updated dict"""
+    from utils.dataloop_helpers import upload_chunks  # Import utils implementation
 
-### 4. Main API (`main.py`)
+    # Extract from shared data dictionary
+    chunks = data.get('chunks', [])
+    item = data.get('item')
+    target_dataset = data.get('target_dataset')
 
-Routes requests to appropriate apps based on MIME type:
+    # Call utils implementation
+    uploaded_items = upload_chunks(chunks, item, target_dataset, '/chunks', {})
+
+    # Put results back in data dictionary
+    data['uploaded_items'] = uploaded_items
+    return data  # Continue the pipeline
+```
+
+### 4. Utils (`utils/`)
+
+**Implementation layer** - Infrastructure and reusable utilities with specific signatures.
+
+Utils contains the actual implementation logic that stages call. Functions here:
+- Have specific type signatures (not the generic `(data, config) -> data`)
+- Can be used standalone outside of pipelines
+- Contain the business logic and integrations
+
+**Available Modules:**
+- **dataloop_helpers.py**: `upload_chunks()`, `upload_images()`, `get_or_create_target_dataset()`
+- **text_cleaning.py**: `clean_text()` using unstructured.io library
+- **chunk_metadata.py**: `ChunkMetadata` class for standardized metadata
+- **dataloop_model_executor.py**: `DataloopModelExecutor` base class for model execution
+
+**Example Utils Function:**
+```python
+# utils/dataloop_helpers.py
+def upload_chunks(
+    chunks: List[str],           # Specific types, not generic dict
+    original_item: dl.Item,
+    target_dataset: dl.Dataset,
+    remote_path: str,
+    processor_metadata: Dict[str, Any]
+) -> List[dl.Item]:              # Returns specific type
+    """Direct implementation - can be used standalone"""
+    # ... actual upload logic ...
+    uploaded_items = target_dataset.items.upload(...)
+    return uploaded_items
+```
+
+**Why Separate Stages and Utils?**
+
+This is the [**Adapter Pattern**](https://en.wikipedia.org/wiki/Adapter_pattern):
+- **Stages**: Uniform pipeline interface for composition
+- **Utils**: Reusable implementations that can be used anywhere
+
+Benefits:
+1. ✅ **Flexibility**: Utils functions work standalone or in pipelines
+2. ✅ **Testability**: Test utils logic separately from pipeline orchestration
+3. ✅ **Composability**: Easy to build different pipelines by mixing stages
+4. ✅ **Clear separation**: Pipeline interface vs. business logic
+
+### 5. Main API (`main.py`)
+
+Routes requests to appropriate apps based on MIME type using a simple registry pattern:
 
 ```python
+# Clean imports - apps is now a proper package
+from apps import PDFProcessor, DOCProcessor
+
 APP_REGISTRY = {
-    'application/pdf': PDFApp,
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DOCApp,
+    'application/pdf': PDFProcessor,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DOCProcessor,
 }
 
 def process_item(item, target_dataset, config):
+    """Auto-detect file type and route to appropriate processor"""
     app_class = APP_REGISTRY[item.mimetype]
     app = app_class(item, target_dataset, config)
     return app.run()
 ```
 
-Convenience functions:
-- `process_pdf(item, dataset, **config)`
-- `process_doc(item, dataset, **config)`
-- `process_batch(items, dataset, config)`
+**Convenience Functions:**
+- `process_pdf(item, dataset, **config)` - Process PDF documents
+- `process_doc(item, dataset, **config)` - Process Word documents
+- `process_batch(items, dataset, config)` - Batch processing
+- `get_supported_file_types()` - List supported MIME types
 
 ## Extension
 
@@ -135,18 +230,33 @@ Convenience functions:
 
 To add support for a new file type (e.g., Excel):
 
-**1. Create Extractor** (`extractors.py`):
+**1. Create Extractor** (`extractors/xls_extractor.py`):
 ```python
-class XLSExtractor(BaseExtractor):
-    def __init__(self):
-        super().__init__('application/vnd.ms-excel', 'XLS')
+from .content_types import ExtractedContent
+import dtlpy as dl
+from typing import Dict, Any
 
-    def extract(self, item, config):
+class XLSExtractor:
+    def __init__(self):
+        self.mime_type = 'application/vnd.ms-excel'
+        self.name = 'XLS'
+
+    def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
         # Extraction logic
         return ExtractedContent(text=extracted_text)
+```
 
-# Register
+Then register in `extractors/registry.py`:
+```python
+from .xls_extractor import XLSExtractor
+
 EXTRACTOR_REGISTRY['application/vnd.ms-excel'] = XLSExtractor
+```
+
+And export from `extractors/__init__.py`:
+```python
+from .xls_extractor import XLSExtractor
+__all__ = [..., 'XLSExtractor']
 ```
 
 **2. Create App** (`apps/xls-processor/xls_app.py`):
@@ -191,32 +301,78 @@ class XLSApp:
         return data.get('uploaded_items', [])
 ```
 
-**3. Register in Main API** (`main.py`):
-```python
-from xls_app import XLSApp
+**3. Create Package Structure** (`apps/xls_processor/`):
+```
+apps/xls_processor/
+├── __init__.py
+├── xls_processor.py
+├── dataloop.json
+└── Dockerfile
+```
 
-APP_REGISTRY['application/vnd.ms-excel'] = XLSApp
+**4. Export from Apps Package** (`apps/__init__.py`):
+```python
+from .xls_processor.xls_processor import XLSProcessor
+__all__ = [..., 'XLSProcessor']
+```
+
+**5. Register in Main API** (`main.py`):
+```python
+from apps import PDFProcessor, DOCProcessor, XLSProcessor
+
+APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
 ```
 
 ### Add New Stage
 
+**Option A: Simple Stage (No Utils Implementation Needed)**
+
 **1. Create Stage** (`stages/my_module.py`):
 ```python
-def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Custom processing logic."""
+def my_simple_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Pipeline interface - simple transformation"""
     content = data.get('content', '')
-    # Transform content
-    data['content'] = transformed_content
+    # Do transformation directly
+    content = content.upper()  # Example
+    data['content'] = content
     return data
 ```
 
-**2. Export** (`stages/__init__.py`):
+**Option B: Stage with Utils Implementation (Recommended for Complex Logic)**
+
+**1. Create Utils Implementation** (`utils/my_helper.py`):
+```python
+def transform_text(text: str, options: dict) -> str:
+    """Utils implementation - reusable, testable"""
+    # Complex logic here
+    return transformed_text
+```
+
+**2. Create Stage Adapter** (`stages/my_module.py`):
+```python
+def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Pipeline interface - calls utils implementation"""
+    from utils.my_helper import transform_text
+
+    # Extract from data dict
+    content = data.get('content', '')
+    options = config.get('transform_options', {})
+
+    # Call utils implementation
+    transformed = transform_text(content, options)
+
+    # Put back in data dict
+    data['content'] = transformed
+    return data
+```
+
+**3. Export Stage** (`stages/__init__.py`):
 ```python
 from .my_module import my_custom_stage
 __all__ = [..., 'my_custom_stage']
 ```
 
-**3. Use in Apps**:
+**4. Use in Apps**:
 ```python
 def run(self):
     data = self.extract(data)

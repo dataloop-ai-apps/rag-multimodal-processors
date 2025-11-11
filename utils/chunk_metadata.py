@@ -5,7 +5,7 @@ Provides a standardized way to create and manage metadata for document chunks.
 
 import dtlpy as dl
 import time
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 class ChunkMetadata:

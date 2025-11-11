@@ -1,28 +1,28 @@
 """
-Base class for using Dataloop models.
-Handles model lookup, deployment verification, execution, and result management.
+Mixins for extractor functionality.
 """
 
-import dtlpy as dl
 from typing import Optional
+import dtlpy as dl
 import logging
 
 logger = logging.getLogger("rag-preprocessor")
 
 
-class DataloopModelExecutor:
+class DataloopModelMixin:
     """
-    Base class for components that use Dataloop models.
-    Handles model lookup, deployment, execution, and error handling.
+    Mixin for extractors that use Dataloop models.
+    Provides model lookup, deployment verification, and execution capabilities.
     """
 
-    def __init__(self, model_id: Optional[str] = None):
+    def __init__(self, model_id: Optional[str] = None, *args, **kwargs):
         """
         Initialize with a model ID.
 
         Args:
             model_id (Optional[str]): Dataloop model ID
         """
+        super().__init__(*args, **kwargs)
         self.model_id = model_id
         self.model = None
 
@@ -45,7 +45,7 @@ class DataloopModelExecutor:
                 return None
         return self.model
 
-    def _check_model_deployed(self, auto_deploy: bool = True) -> tuple:
+    def _check_model_deployed(self, auto_deploy: bool = True):
         """
         Check if the model is deployed and ready.
 
@@ -81,7 +81,7 @@ class DataloopModelExecutor:
 
         return model, model.status
 
-    def execute(self, item: dl.Item, **kwargs) -> dl.Item:
+    def execute_model(self, item: dl.Item, **kwargs) -> dl.Item:
         """
         Execute the model on the item and wait for completion.
 
@@ -97,7 +97,7 @@ class DataloopModelExecutor:
             Exception: If execution fails or times out
         """
         if not self.model_id:
-            raise ValueError("model_id must be provided to execute")
+            raise ValueError("model_id must be provided to execute_model")
 
         # Check if model is deployed
         self._check_model_deployed()
@@ -132,7 +132,7 @@ class DataloopModelExecutor:
 
     def has_dataloop_backend(self) -> bool:
         """
-        Check if this executor is configured to use Dataloop models.
+        Check if this extractor is configured to use Dataloop models.
 
         Returns:
             bool: True if model_id is configured

@@ -362,5 +362,5 @@ pyrightconfig.json
 /idea
 *.whl
 scripts/
-.claude/
-.cursor/
+.claude/*
+.cursor/*

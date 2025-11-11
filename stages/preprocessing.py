@@ -5,6 +5,7 @@ All functions follow signature: (data: dict, config: dict) -> dict
 
 from typing import Dict, Any
 import re
+from utils.text_cleaning import clean_text as deep_clean
 
 
 def clean_text(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -29,11 +30,7 @@ def clean_text(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
 
     # Optional spell checking
     if config.get('correct_spelling', False):
-        try:
-            from utils.text_cleaning import clean_text as deep_clean
-            content = deep_clean(content)
-        except ImportError:
-            print("Warning: text_cleaning utils not found, skipping spell correction")
+        content = deep_clean(content)
 
     data['content'] = content
     data.setdefault('metadata', {})['preprocessing_applied'] = True

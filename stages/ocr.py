@@ -4,7 +4,10 @@ Adds OCR-extracted text to content.
 All functions follow signature: (data: dict, config: dict) -> dict
 """
 
+import re
+import dtlpy as dl
 from typing import Dict, Any, List
+from extractors.ocr_extractor import OCRExtractor
 
 
 def ocr_enhance(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -13,10 +16,19 @@ def ocr_enhance(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
 
     Args:
         data: Must contain 'images' list and 'content' string
-        config: Can contain 'use_ocr', 'ocr_integration_method'
+        config: Can contain:
+            - 'use_ocr' (bool): Enable OCR processing
+            - 'ocr_integration_method' (str): How to integrate OCR text
+              Options: 'per_page', 'append', 'prepend', 'separate'
 
     Returns:
         data with OCR text added to content
+
+    Integration methods:
+        - 'per_page': Interleave OCR text after each page's content (maintains structure)
+        - 'append': Add all OCR text at the end
+        - 'prepend': Add all OCR text at the beginning
+        - 'separate': Store OCR text in separate field 'ocr_content'
     """
     if not config.get('use_ocr', False):
         return data
@@ -25,14 +37,10 @@ def ocr_enhance(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     if not images:
         return data
 
-    try:
-        from extractors.ocr_extractor import OCRExtractor
-    except ImportError:
-        print("Warning: OCRExtractor not found, skipping OCR")
-        return data
-
     ocr_extractor = OCRExtractor()
-    ocr_texts = []
+
+    # Extract OCR text from all images, grouped by page
+    ocr_by_page = {}  # {page_number: [ocr_texts]}
 
     for img in images:
         if isinstance(img, dict):
@@ -46,26 +54,123 @@ def ocr_enhance(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 ocr_text = ocr_extractor.extract_text(img_path)
                 if ocr_text:
-                    page_info = f" (Page {page_num})" if page_num else ""
-                    ocr_texts.append(f"--- Image{page_info} ---\n{ocr_text}")
+                    if page_num not in ocr_by_page:
+                        ocr_by_page[page_num] = []
+                    ocr_by_page[page_num].append(ocr_text)
             except Exception as e:
                 print(f"Warning: OCR failed for {img_path}: {e}")
 
-    if ocr_texts:
-        integration_method = config.get('ocr_integration_method', 'append')
+    if not ocr_by_page:
+        return data
 
-        if integration_method == 'append':
-            data['content'] += '\n\n--- OCR Extracted Text ---\n\n' + '\n\n'.join(ocr_texts)
-        elif integration_method == 'prepend':
-            data['content'] = '\n\n'.join(ocr_texts) + '\n\n--- Original Text ---\n\n' + data['content']
-        elif integration_method == 'separate':
-            data['ocr_content'] = '\n\n'.join(ocr_texts)
+    integration_method = config.get('ocr_integration_method', 'per_page')
 
-        data.setdefault('metadata', {})['ocr_applied'] = True
-        data['metadata']['ocr_text_length'] = sum(len(t) for t in ocr_texts)
-        data['metadata']['ocr_image_count'] = len(ocr_texts)
+    if integration_method == 'per_page':
+        # Interleave OCR text after each page's content
+        data['content'] = _integrate_ocr_per_page(data['content'], ocr_by_page)
+
+    elif integration_method == 'append':
+        # Add all OCR text at the end
+        all_ocr_texts = []
+        for page_num in sorted(ocr_by_page.keys()):
+            page_info = f" (Page {page_num})" if page_num else ""
+            for ocr_text in ocr_by_page[page_num]:
+                all_ocr_texts.append(f"--- Image{page_info} ---\n{ocr_text}")
+        data['content'] += '\n\n--- OCR Extracted Text ---\n\n' + '\n\n'.join(all_ocr_texts)
+
+    elif integration_method == 'prepend':
+        # Add all OCR text at the beginning
+        all_ocr_texts = []
+        for page_num in sorted(ocr_by_page.keys()):
+            page_info = f" (Page {page_num})" if page_num else ""
+            for ocr_text in ocr_by_page[page_num]:
+                all_ocr_texts.append(f"--- Image{page_info} ---\n{ocr_text}")
+        data['content'] = '\n\n'.join(all_ocr_texts) + '\n\n--- Original Text ---\n\n' + data['content']
+
+    elif integration_method == 'separate':
+        # Store OCR text in separate field
+        all_ocr_texts = []
+        for page_num in sorted(ocr_by_page.keys()):
+            page_info = f" (Page {page_num})" if page_num else ""
+            for ocr_text in ocr_by_page[page_num]:
+                all_ocr_texts.append(f"--- Image{page_info} ---\n{ocr_text}")
+        data['ocr_content'] = '\n\n'.join(all_ocr_texts)
+
+    # Add metadata
+    total_ocr_length = sum(len(t) for texts in ocr_by_page.values() for t in texts)
+    total_ocr_count = sum(len(texts) for texts in ocr_by_page.values())
+
+    data.setdefault('metadata', {})['ocr_applied'] = True
+    data['metadata']['ocr_text_length'] = total_ocr_length
+    data['metadata']['ocr_image_count'] = total_ocr_count
+    data['metadata']['ocr_integration_method'] = integration_method
 
     return data
+
+
+def _integrate_ocr_per_page(content: str, ocr_by_page: Dict[int, List[str]]) -> str:
+    """
+    Integrate OCR text into content on a per-page basis.
+
+    Parses content by page markers and inserts OCR text after each page.
+
+    Args:
+        content: Original document content with page markers
+        ocr_by_page: Dictionary mapping page numbers to lists of OCR texts
+
+    Returns:
+        Content with OCR text interleaved after each page
+    """
+    # Split content by page markers: "--- Page N ---"
+    page_pattern = r'(--- Page (\d+) ---)'
+    parts = re.split(page_pattern, content)
+
+    if len(parts) <= 1:
+        # No page markers found, fall back to append method
+        all_ocr_texts = []
+        for page_num in sorted(ocr_by_page.keys()):
+            page_info = f" (Page {page_num})" if page_num else ""
+            for ocr_text in ocr_by_page[page_num]:
+                all_ocr_texts.append(f"--- Image{page_info} ---\n{ocr_text}")
+        return content + '\n\n--- OCR Extracted Text ---\n\n' + '\n\n'.join(all_ocr_texts)
+
+    # Reconstruct content with OCR text after each page
+    result_parts = []
+
+    # First part before any page markers
+    if parts[0].strip():
+        result_parts.append(parts[0])
+
+    # Process each page
+    i = 1
+    while i < len(parts):
+        if i + 2 < len(parts):
+            # parts[i] = full marker "--- Page N ---"
+            # parts[i+1] = page number "N"
+            # parts[i+2] = page content
+
+            page_marker = parts[i]
+            page_num = int(parts[i + 1])
+            page_content = parts[i + 2]
+
+            # Add page marker and content
+            result_parts.append(page_marker)
+            result_parts.append(page_content)
+
+            # Add OCR text for this page if available
+            if page_num in ocr_by_page and ocr_by_page[page_num]:
+                ocr_section = [f"\n--- OCR from Page {page_num} Images ---"]
+                for idx, ocr_text in enumerate(ocr_by_page[page_num], 1):
+                    ocr_section.append(f"\nImage {idx}:\n{ocr_text}")
+                result_parts.append('\n'.join(ocr_section))
+
+            i += 3
+        else:
+            # Remaining parts
+            result_parts.extend(parts[i:])
+            break
+
+    return ''.join(result_parts)
 
 
 def describe_images_with_dataloop(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -86,8 +191,6 @@ def describe_images_with_dataloop(data: Dict[str, Any], config: Dict[str, Any]) 
     if not images:
         return data
 
-    import dtlpy as dl
-
     model_id = config.get('vision_model_id')
     if not model_id:
         print("Warning: vision_model_id not provided, skipping image descriptions")
@@ -104,6 +207,9 @@ def describe_images_with_dataloop(data: Dict[str, Any], config: Dict[str, Any]) 
                 continue
 
             try:
+                # NOTE: According to Dataloop SDK, model.predict() only accepts item_ids or dataset_id
+                # and returns an Execution object, not direct results. This code may need to be updated
+                # to create items first and use item_ids, then wait for execution and retrieve results.
                 # Run vision model
                 result = model.predict([img_path])
                 description = result[0] if result else "No description available"
@@ -148,8 +254,6 @@ def ocr_batch_enhance(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str,
     images = data.get('images', [])
     if not images:
         return data
-
-    import dtlpy as dl
 
     model_id = config.get('ocr_model_id')
     if not model_id:

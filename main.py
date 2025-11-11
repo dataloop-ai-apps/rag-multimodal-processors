@@ -24,14 +24,7 @@ from typing import Dict, Any, List
 import dtlpy as dl
 
 # Import app processors
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'apps', 'pdf-processor'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'apps', 'doc-processor'))
-
-from pdf_app import PDFApp
-from doc_app import DOCApp
+from apps import PDFProcessor, DOCProcessor
 
 # Setup module logger
 logger = logging.getLogger(__name__)
@@ -49,9 +42,9 @@ if not logger.handlers:
 
 # Map MIME types to app classes
 APP_REGISTRY = {
-    'application/pdf': PDFApp,
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DOCApp,
-    'application/vnd.google-apps.document': DOCApp,  # Google Docs exported as DOCX
+    'application/pdf': PDFProcessor,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DOCProcessor,
+    'application/vnd.google-apps.document': DOCProcessor,  # Google Docs exported as DOCX
 }
 
 
@@ -65,7 +58,7 @@ def get_app_for_item(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str
         config: Processing configuration
 
     Returns:
-        Initialized app instance (PDFApp or DOCApp)
+        Initialized app instance (PDFProcessor or DOCProcessor)
 
     Raises:
         ValueError: If file type not supported
@@ -142,14 +135,18 @@ def process_pdf(item: dl.Item, target_dataset: dl.Dataset, **config) -> List[dl.
         target_dataset: Target dataset for chunks
         **config: Configuration options:
             - use_ocr (bool): Apply OCR to images (default: False)
+            - ocr_integration_method (str): How to integrate OCR text (default: 'per_page')
+              Options: 'per_page', 'append', 'prepend', 'separate'
+              * 'per_page': Interleave OCR after each page (maintains document structure)
+              * 'append': Add all OCR text at the end
+              * 'prepend': Add all OCR text at the beginning
+              * 'separate': Store OCR in separate 'ocr_content' field
             - extract_images (bool): Extract images from PDF (default: True)
-            - upload_images (bool): Upload extracted images to Dataloop (default: True)
             - link_images_to_chunks (bool): Associate images with chunks by page number (default: True)
             - embed_images_in_chunks (bool): Embed image references in chunk text (default: False)
             - image_marker_format (str): Format for embedded image markers: 'markdown', 'reference', or 'inline' (default: 'markdown')
             - image_context_before (int): Characters of text before image to include (default: 200)
             - image_context_after (int): Characters of text after image to include (default: 200)
-            - image_upload_path (str): Remote path for uploaded images (default: '/images')
             - max_chunk_size (int): Maximum chunk size (default: 300)
             - chunk_overlap (int): Overlap between chunks (default: 20)
             - chunking_strategy (str): 'recursive', 'semantic', 'sentence', or 'paragraph'
@@ -163,14 +160,14 @@ def process_pdf(item: dl.Item, target_dataset: dl.Dataset, **config) -> List[dl.
         >>> # Basic processing (with images)
         >>> chunks = process_pdf(item, dataset)
         >>>
-        >>> # With OCR
+        >>> # With OCR (per-page integration by default)
         >>> chunks = process_pdf(item, dataset, use_ocr=True)
+        >>>
+        >>> # OCR with custom integration method
+        >>> chunks = process_pdf(item, dataset, use_ocr=True, ocr_integration_method='append')
         >>>
         >>> # Without image extraction
         >>> chunks = process_pdf(item, dataset, extract_images=False)
-        >>>
-        >>> # Extract but don't upload images
-        >>> chunks = process_pdf(item, dataset, upload_images=False)
         >>>
         >>> # Embed images in chunk text (multimodal chunks)
         >>> chunks = process_pdf(item, dataset, embed_images_in_chunks=True)
@@ -294,54 +291,14 @@ if __name__ == '__main__':
     for mime_type in get_supported_file_types():
         print(f"  {mime_type}")
 
-    print("\n=== Example Usage ===")
-    print(
-        """
-    import dtlpy as dl
-    from main import process_pdf, process_doc, process_batch
-
-    # Get item and dataset
-    item = dl.items.get(item_id='your-item-id')
-    dataset = dl.datasets.get(dataset_id='your-dataset-id')
-
-    # Basic PDF processing
-    chunks = process_pdf(item, dataset)
-
-    # PDF with OCR
-    chunks = process_pdf(item, dataset, use_ocr=True)
-
-    # PDF with custom chunk size
-    chunks = process_pdf(item, dataset, max_chunk_size=500, chunk_overlap=50)
-
-    # PDF with semantic chunking
-    chunks = process_pdf(
-        item, dataset,
-        chunking_strategy='semantic',
-        llm_model_id='your-model-id'
-    )
-
-    # Process DOC file
-    chunks = process_doc(item, dataset, max_chunk_size=1000)
-
-    # Batch processing
-    items = dataset.items.list()
-    results = process_batch(items, target_dataset, {'use_ocr': True})
-
-    # Debug mode
-    chunks = process_pdf(item, dataset, log_level='DEBUG')
-    """
-    )
-
-    print("Running real example...")
-
     # Get items
     item = dl.items.get(
         item_id='6911a710d4c1299c6780c14f'
-    )  # doc: 6910ba43732d419b5d98b41c, pdf: 6910ba43732d419b5d98b41c
+    )  # doc: 6910ba43732d419b5d98b41c, pdf: 6911a710d4c1299c6780c14f
     dataset = item.dataset
 
     # Auto-detect file type from metadata and process accordingly
     chunks = process_item(
-        item, dataset, {'max_chunk_size': 1000, 'use_ocr': False}  # Set to True for PDFs that need OCR
+        item, dataset, {'max_chunk_size': 1000, 'use_ocr': False} 
     )
     print(f"Created {len(chunks)} chunks")

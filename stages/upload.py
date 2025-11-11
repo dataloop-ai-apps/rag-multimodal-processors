@@ -5,6 +5,7 @@ All functions follow signature: (data: dict, config: dict) -> dict
 
 from typing import Dict, Any, List
 import dtlpy as dl
+from utils.dataloop_helpers import upload_chunks
 
 
 def upload_to_dataloop(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -18,13 +19,6 @@ def upload_to_dataloop(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str
     Returns:
         data with 'uploaded_items' added
     """
-    try:
-        from utils.dataloop_helpers import upload_chunks
-    except ImportError:
-        print("Warning: dataloop_helpers not found, cannot upload chunks")
-        data['uploaded_items'] = []
-        return data
-
     chunks = data.get('chunks', [])
     item = data.get('item')
     target_dataset = data.get('target_dataset')
@@ -49,65 +43,6 @@ def upload_to_dataloop(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str
 
     data['uploaded_items'] = uploaded_items
     data['metadata']['uploaded_count'] = len(uploaded_items)
-
-    return data
-
-
-def upload_with_images(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Upload chunks along with extracted images.
-
-    Args:
-        data: Must contain 'chunks', 'images', 'item', 'target_dataset'
-        config: Can contain:
-            - 'upload_images' (bool): Whether to upload images (default: True)
-            - 'image_upload_path' (str): Remote path for images (default: '/images')
-
-    Returns:
-        data with 'uploaded_items' and 'uploaded_images' added
-    """
-    # First upload chunks
-    data = upload_to_dataloop(data, config)
-
-    # Optionally upload images
-    if not config.get('upload_images', True):
-        return data
-
-    images = data.get('images', [])
-    target_dataset = data.get('target_dataset')
-    item = data.get('item')
-
-    if not images or not target_dataset:
-        return data
-
-    try:
-        from utils.dataloop_helpers import upload_images
-    except ImportError:
-        print("Warning: dataloop_helpers.upload_images not found, using fallback")
-        # Fallback to simple upload
-        uploaded_images = []
-        image_upload_path = config.get('image_upload_path', '/images')
-        for img in images:
-            img_path = img.get('path') if isinstance(img, dict) else (img.path if hasattr(img, 'path') else None)
-            if not img_path:
-                continue
-            try:
-                uploaded_img = target_dataset.items.upload(local_path=img_path, remote_path=image_upload_path)
-                uploaded_images.append(uploaded_img)
-            except Exception as e:
-                print(f"Warning: Failed to upload image {img_path}: {e}")
-        data['uploaded_images'] = uploaded_images
-        data['metadata']['uploaded_image_count'] = len(uploaded_images)
-        return data
-
-    # Use helper function for proper image upload with metadata
-    image_upload_path = config.get('image_upload_path', '/images')
-    uploaded_images = upload_images(
-        images=images, original_item=item, target_dataset=target_dataset, remote_path=image_upload_path
-    )
-
-    data['uploaded_images'] = uploaded_images
-    data['metadata']['uploaded_image_count'] = len(uploaded_images)
 
     return data
 

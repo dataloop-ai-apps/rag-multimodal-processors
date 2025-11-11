@@ -3,158 +3,203 @@ Chunking stages for splitting content into chunks.
 All functions follow signature: (data: dict, config: dict) -> dict
 """
 
+import re
 from typing import Dict, Any, List
+import logging
+import nltk
+from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
+
+logger = logging.getLogger("rag-preprocessor")
 
 
-def chunk_recursive(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+# ============================================================================
+# TEXT CHUNKER CLASS
+# ============================================================================
+
+
+class TextChunker:
     """
-    Chunk content using recursive character splitting.
+    Text chunker with support for multiple chunking strategies.
+    """
+
+    def __init__(
+        self,
+        chunk_size: int = 300,
+        chunk_overlap: int = 20,
+        strategy: str = 'recursive',
+        use_markdown_splitting: bool = False,
+    ):
+        """
+        Initialize text chunker with strategy.
+
+        Args:
+            chunk_size (int): Maximum size of each chunk
+            chunk_overlap (int): Overlap between consecutive chunks
+            strategy (str): Chunking strategy ('fixed-size', 'recursive', 'nltk-sentence', 'nltk-paragraphs', '1-chunk', 'none')
+            use_markdown_splitting (bool): Use markdown-aware separators for recursive splitting
+        """
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.strategy = strategy
+        self.use_markdown_splitting = use_markdown_splitting
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> 'TextChunker':
+        """
+        Create TextChunker from configuration dictionary.
+
+        Args:
+            config: Configuration dict with:
+                - 'chunking_strategy': Strategy name (default: 'recursive')
+                - 'max_chunk_size': Maximum chunk size (default: 300)
+                - 'chunk_overlap': Overlap between chunks (default: 20)
+                - 'use_markdown_splitting': Use markdown-aware separators (default: False)
+
+        Returns:
+            TextChunker instance configured from config
+        """
+        strategy = config.get('chunking_strategy', 'recursive')
+
+        # Map common strategy name variations
+        strategy_map = {'sentence': 'nltk-sentence', 'paragraph': 'nltk-paragraphs'}
+        strategy = strategy_map.get(strategy, strategy)
+
+        return cls(
+            chunk_size=config.get('max_chunk_size', 300),
+            chunk_overlap=config.get('chunk_overlap', 20),
+            strategy=strategy,
+            use_markdown_splitting=config.get('use_markdown_splitting', False),
+        )
+
+    def chunk(self, text: str) -> List[str]:
+        """
+        Split text into chunks based on the configured strategy.
+
+        Args:
+            text (str): Input text to chunk
+
+        Returns:
+            List[str]: List of text chunks
+        """
+        logger.info(
+            f"Chunking text | strategy={self.strategy} chunk_size={self.chunk_size} "
+            f"chunk_overlap={self.chunk_overlap} use_markdown={self.use_markdown_splitting} "
+            f"text_length={len(text)}"
+        )
+
+        if self.strategy == 'fixed-size':
+            chunks = self._chunk_fixed_size(text)
+        elif self.strategy == 'recursive':
+            chunks = self._chunk_recursive(text)
+        elif self.strategy == 'nltk-sentence':
+            chunks = self._chunk_nltk_sentence(text)
+        elif self.strategy == 'nltk-paragraphs':
+            chunks = self._chunk_nltk_paragraphs(text)
+        elif self.strategy == '1-chunk' or self.strategy == 'none':
+            chunks = [text]
+        else:
+            logger.warning(f"Unknown chunking strategy: {self.strategy}, using recursive")
+            chunks = self._chunk_recursive(text)
+
+        logger.info(f"Chunking complete | chunks_created={len(chunks)}")
+        return chunks
+
+    def _chunk_fixed_size(self, text: str) -> List[str]:
+        """Fixed-size chunking with character-based splitting."""
+        text_splitter = CharacterTextSplitter(
+            separator="", chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap
+        )
+        chunks = text_splitter.create_documents([text])
+        return [chunk.page_content for chunk in chunks]
+
+    def _chunk_recursive(self, text: str) -> List[str]:
+        """Recursive chunking that respects semantic boundaries."""
+        if self.use_markdown_splitting:
+            # Markdown-aware separators (in order of priority)
+            separators = [
+                "\n## ",  # H2 headers
+                "\n### ",  # H3 headers
+                "\n#### ",  # H4 headers
+                "\n---\n",  # Horizontal rules
+                "\n\n",  # Paragraphs
+                "\n",  # Lines
+                " ",  # Words
+                "",  # Characters
+            ]
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+                length_function=len,
+                is_separator_regex=False,
+                separators=separators,
+            )
+        else:
+            # Standard recursive splitting
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+                length_function=len,
+                is_separator_regex=False,
+            )
+
+        chunks = text_splitter.create_documents([text])
+        return [chunk.page_content for chunk in chunks]
+
+    def _chunk_nltk_sentence(self, text: str) -> List[str]:
+        """Chunk by sentence boundaries using NLTK."""
+        return nltk.sent_tokenize(text)
+
+    def _chunk_nltk_paragraphs(self, text: str) -> List[str]:
+        """Chunk by paragraph boundaries using NLTK."""
+        return nltk.tokenize.blankline_tokenize(text)
+
+
+# ============================================================================
+# CHUNKING STAGE FUNCTIONS
+# ============================================================================
+
+
+def chunk_text(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Chunk content using the strategy specified in config.
 
     Args:
         data: Must contain 'content' key
-        config: Can contain 'max_chunk_size', 'chunk_overlap'
+        config: Can contain:
+            - 'chunking_strategy': Strategy name ('recursive', 'nltk-sentence',
+              'nltk-paragraphs', 'fixed-size', 'none', '1-chunk')
+            - 'max_chunk_size': Maximum chunk size (default: 300)
+            - 'chunk_overlap': Overlap between chunks (default: 20)
+            - 'use_markdown_splitting': Use markdown-aware separators (default: False)
 
     Returns:
-        data with 'chunks' list added
+        data with 'chunks' list added and metadata updated
     """
-    from chunkers.text_chunker import TextChunker
-
     content = data.get('content', '')
 
     if not content:
         data['chunks'] = []
+        data.setdefault('metadata', {})['chunking_method'] = 'none'
+        data['metadata']['chunk_count'] = 0
         return data
 
-    chunker = TextChunker(
-        chunk_size=config.get('max_chunk_size', 300),
-        chunk_overlap=config.get('chunk_overlap', 20),
-        strategy='recursive',
-    )
-
+    # Create chunker from config
+    chunker = TextChunker.from_config(config)
     chunks = chunker.chunk(content)
 
-    data['chunks'] = chunks
-    data.setdefault('metadata', {})['chunking_method'] = 'recursive'
-    data['metadata']['chunk_count'] = len(chunks)
-
-    return data
-
-
-def chunk_by_sentence(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Chunk content by sentences using NLTK.
-
-    Args:
-        data: Must contain 'content' key
-        config: Can contain 'max_chunk_size', 'chunk_overlap'
-
-    Returns:
-        data with 'chunks' list added
-    """
-    from chunkers.text_chunker import TextChunker
-
-    content = data.get('content', '')
-
-    if not content:
-        data['chunks'] = []
-        return data
-
-    chunker = TextChunker(
-        chunk_size=config.get('max_chunk_size', 300),
-        chunk_overlap=config.get('chunk_overlap', 20),
-        strategy='nltk-sentence',
-    )
-
-    chunks = chunker.chunk(content)
+    # Map strategy names to method names for metadata
+    strategy_name_map = {
+        'recursive': 'recursive',
+        'nltk-sentence': 'sentence',
+        'nltk-paragraphs': 'paragraph',
+        'fixed-size': 'fixed-size',
+        'none': 'none',
+        '1-chunk': 'none',
+    }
+    method_name = strategy_name_map.get(chunker.strategy, chunker.strategy)
 
     data['chunks'] = chunks
-    data.setdefault('metadata', {})['chunking_method'] = 'sentence'
-    data['metadata']['chunk_count'] = len(chunks)
-
-    return data
-
-
-def chunk_by_paragraph(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Chunk content by paragraphs.
-
-    Args:
-        data: Must contain 'content' key
-        config: Can contain 'max_chunk_size', 'chunk_overlap'
-
-    Returns:
-        data with 'chunks' list added
-    """
-    from chunkers.text_chunker import TextChunker
-
-    content = data.get('content', '')
-
-    if not content:
-        data['chunks'] = []
-        return data
-
-    chunker = TextChunker(
-        chunk_size=config.get('max_chunk_size', 300),
-        chunk_overlap=config.get('chunk_overlap', 20),
-        strategy='nltk-paragraphs',
-    )
-
-    chunks = chunker.chunk(content)
-
-    data['chunks'] = chunks
-    data.setdefault('metadata', {})['chunking_method'] = 'paragraph'
-    data['metadata']['chunk_count'] = len(chunks)
-
-    return data
-
-
-def no_chunking(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Return entire content as single chunk.
-
-    Args:
-        data: Must contain 'content' key
-        config: Not used
-
-    Returns:
-        data with single chunk in 'chunks' list
-    """
-    content = data.get('content', '')
-    data['chunks'] = [content] if content else []
-    data.setdefault('metadata', {})['chunking_method'] = 'none'
-    data['metadata']['chunk_count'] = len(data['chunks'])
-    return data
-
-
-def chunk_fixed_size(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Chunk content using fixed size chunks.
-
-    Args:
-        data: Must contain 'content' key
-        config: Can contain 'max_chunk_size', 'chunk_overlap'
-
-    Returns:
-        data with 'chunks' list added
-    """
-    from chunkers.text_chunker import TextChunker
-
-    content = data.get('content', '')
-
-    if not content:
-        data['chunks'] = []
-        return data
-
-    chunker = TextChunker(
-        chunk_size=config.get('max_chunk_size', 300),
-        chunk_overlap=config.get('chunk_overlap', 20),
-        strategy='fixed-size',
-    )
-
-    chunks = chunker.chunk(content)
-
-    data['chunks'] = chunks
-    data.setdefault('metadata', {})['chunking_method'] = 'fixed-size'
+    data.setdefault('metadata', {})['chunking_method'] = method_name
     data['metadata']['chunk_count'] = len(chunks)
 
     return data
@@ -180,9 +225,6 @@ def chunk_recursive_with_images(data: Dict[str, Any], config: Dict[str, Any]) ->
         - Handling chunks that span multiple pages
         - PDFs without page markers
     """
-    from chunkers.text_chunker import TextChunker
-    import re
-
     content = data.get('content', '')
     images = data.get('images', [])
     link_images = config.get('link_images_to_chunks', True)
@@ -205,13 +247,8 @@ def chunk_recursive_with_images(data: Dict[str, Any], config: Dict[str, Any]) ->
         page_num = int(match.group(1))
         page_positions.append((match.start(), page_num))
 
-    # Chunk the content
-    chunker = TextChunker(
-        chunk_size=config.get('max_chunk_size', 300),
-        chunk_overlap=config.get('chunk_overlap', 20),
-        strategy='recursive',
-    )
-
+    # Chunk the content using recursive strategy
+    chunker = TextChunker.from_config({**config, 'chunking_strategy': 'recursive'})
     chunks = chunker.chunk(content)
 
     # Determine which pages each chunk belongs to
@@ -292,9 +329,6 @@ def chunk_with_embedded_images(data: Dict[str, Any], config: Dict[str, Any]) -> 
         - Context window around images
         - Multiple images in same chunk
     """
-    from chunkers.text_chunker import TextChunker
-    import re
-
     content = data.get('content', '')
     images = data.get('images', [])
 
@@ -369,12 +403,7 @@ def chunk_with_embedded_images(data: Dict[str, Any], config: Dict[str, Any]) -> 
             offset += len(marker)
 
     # Now chunk the content with embedded image markers
-    chunker = TextChunker(
-        chunk_size=config.get('max_chunk_size', 300),
-        chunk_overlap=config.get('chunk_overlap', 20),
-        strategy='recursive',
-    )
-
+    chunker = TextChunker.from_config({**config, 'chunking_strategy': 'recursive'})
     chunks = chunker.chunk(content_with_images)
 
     # Build chunk metadata with image associations

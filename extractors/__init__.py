@@ -1,50 +1,40 @@
 """
 Extractors package for extracting content from items.
-Handles OCR, transcription, captioning, and other extraction methods.
+Handles PDF, DOCX, OCR, and other extraction methods.
 """
 
-import sys
-import importlib.util
-from pathlib import Path
+# Import data structures
+from .content_types import (
+    ExtractedContent,
+    ImageContent,
+    TableContent,
+)
 
-# Import from parent-level extractors.py file
-# This handles the case where extractors is both a file and a package
-_parent_dir = Path(__file__).parent.parent
-_extractors_file = _parent_dir / 'extractors.py'
-
-if _extractors_file.exists():
-    spec = importlib.util.spec_from_file_location("extractors_module", _extractors_file)
-    extractors_module = importlib.util.module_from_spec(spec)
-    sys.modules['extractors_module'] = extractors_module
-    spec.loader.exec_module(extractors_module)
-
-    # Re-export the main functions and classes
-    get_extractor = extractors_module.get_extractor
-    ExtractedContent = extractors_module.ExtractedContent
-    BaseExtractor = extractors_module.BaseExtractor
-    PDFExtractor = extractors_module.PDFExtractor
-    DocsExtractor = extractors_module.DocsExtractor
-    EXTRACTOR_REGISTRY = extractors_module.EXTRACTOR_REGISTRY
-    get_supported_types = extractors_module.get_supported_types
-    register_extractor = extractors_module.register_extractor
-else:
-    raise ImportError("Could not find extractors.py file")
-
-# Import from package
+# Import specific extractors
+from .pdf_extractor import PDFExtractor
+from .docs_extractor import DocsExtractor
 from .ocr_extractor import OCRExtractor
 
-# Future extractors (uncomment as implemented):
-# from .audio_extractor import AudioExtractor
-# from .caption_extractor import CaptionExtractor
+# Import registry functions
+from .registry import (
+    EXTRACTOR_REGISTRY,
+    get_extractor,
+    register_extractor,
+    get_supported_types,
+)
 
 __all__ = [
-    'OCRExtractor',
-    'BaseExtractor',
+    # Data models
+    'ExtractedContent',
+    'ImageContent',
+    'TableContent',
+    # Extractors
     'PDFExtractor',
     'DocsExtractor',
-    'get_extractor',
-    'ExtractedContent',
+    'OCRExtractor',
+    # Registry
     'EXTRACTOR_REGISTRY',
-    'get_supported_types',
+    'get_extractor',
     'register_extractor',
+    'get_supported_types',
 ]

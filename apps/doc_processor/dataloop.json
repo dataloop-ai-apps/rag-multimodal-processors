@@ -1,0 +1,215 @@
+{
+  "displayName": "DOC to Chunks",
+  "name": "doc_to_chunks",
+  "scope": "public",
+  "version": "0.0.1",
+  "description": "DOC/DOCX processing service that extracts text, tables, and images, and creates chunks for RAG pipelines. Supports multiple chunking strategies.",
+  "attributes": {
+    "Category": "Application",
+    "Provider": "Dataloop",
+    "Deployed By": "Dataloop",
+    "License": "Apache 2.0",
+    "Application Type": ["Pipeline Node"],
+    "Media Type": ["Document"]
+  },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.0"
+  },
+  "components": {
+    "computeConfigs": [
+      {
+        "name": "doc-processor-service",
+        "runtime": {
+          "podType": "regular-m",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.1",
+          "concurrency": 25,
+          "autoscaler": {
+            "minReplicas": 0,
+            "maxReplicas": 10,
+            "queueLength": 100
+          }
+        }
+      }
+    ],
+    "pipelineNodes": [
+      {
+        "invoke": {
+          "type": "function",
+          "namespace": "doc-processor-service.doc-processor-module.process_document"
+        },
+        "name": "process_document",
+        "categories": ["document-processing"],
+        "displayName": "DOC to Chunks",
+        "description": "Process DOC/DOCX documents to extract text, tables, images, and create chunks",
+        "scope": "project",
+        "configuration": {
+          "fields": [
+            {
+              "name": "name",
+              "title": "Node Name",
+              "props": {
+                "title": true,
+                "type": "string",
+                "default": "DOC-to-Chunks",
+                "required": true,
+                "placeholder": "Insert node name"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-input"
+            },
+            {
+              "name": "extract_tables",
+              "title": "Extract Tables",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "description": "Extract tables from DOCX and include them as markdown in chunks"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "extract_images",
+              "title": "Extract Images",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": true,
+                "description": "Extract embedded images from DOCX"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "chunking_strategy",
+              "title": "Chunking Strategy",
+              "props": {
+                "type": "string",
+                "required": true,
+                "default": "recursive",
+                "options": [
+                  {
+                    "value": "fixed-size",
+                    "label": "Fixed Size"
+                  },
+                  {
+                    "value": "recursive",
+                    "label": "Recursive"
+                  },
+                  {
+                    "value": "nltk-sentence",
+                    "label": "NLTK Sentence"
+                  },
+                  {
+                    "value": "nltk-paragraphs",
+                    "label": "NLTK Paragraphs"
+                  },
+                  {
+                    "value": "1-chunk",
+                    "label": "Single Chunk"
+                  }
+                ]
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-select"
+            },
+            {
+              "name": "max_chunk_size",
+              "title": "Max Chunk Size",
+              "props": {
+                "type": "number",
+                "default": 300,
+                "min": 1,
+                "max": 2000,
+                "step": 50,
+                "title": true,
+                "required": true
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider"
+            },
+            {
+              "name": "chunk_overlap",
+              "title": "Chunk Overlap",
+              "props": {
+                "type": "number",
+                "default": 50,
+                "min": 0,
+                "max": 400,
+                "step": 10,
+                "title": true,
+                "required": true
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider"
+            },
+            {
+              "name": "to_correct_spelling",
+              "title": "Apply Text Cleaning",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "description": "Apply text cleaning and normalization to fix formatting inconsistencies"
+              },
+              "widget": "dl-checkbox"
+            }
+          ]
+        }
+      }
+    ],
+    "modules": [
+      {
+        "name": "doc-processor-module",
+        "computeConfig": "doc-processor-service",
+        "entryPoint": "apps/doc_processor/doc_processor.py",
+        "className": "DOCProcessor",
+        "initInputs": [],
+        "functions": [
+          {
+            "name": "process_document",
+            "input": [
+              {
+                "type": "Item",
+                "name": "item"
+              },
+              {
+                "type": "Dataset",
+                "name": "target_dataset"
+              }
+            ],
+            "output": [
+              {
+                "type": "Item[]",
+                "name": "items"
+              }
+            ],
+            "displayIcon": "icon-dl-doc",
+            "displayName": "DOC to Chunks"
+          }
+        ]
+      }
+    ]
+  }
+}

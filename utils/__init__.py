@@ -1,6 +1,6 @@
 """
-Utilities package for shared functionality.
-Common helpers used across processors, chunkers, and extractors.
+Utils infrastructure package for shared functionality.
+Provides data models, Dataloop helpers, and common utilities used across processors.
 """
 
 from .text_cleaning import clean_text
