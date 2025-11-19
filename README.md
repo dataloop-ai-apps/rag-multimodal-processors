@@ -188,7 +188,7 @@ To add support for a new file type (e.g., Excel):
 
 **1. Create Extractor** in `extractors/xls_extractor.py`:
 ```python
-from .content_types import ExtractedContent
+from .data_types import ExtractedContent
 import dtlpy as dl
 from typing import Dict, Any
 
@@ -215,7 +215,7 @@ import logging
 from typing import Dict, Any, List
 import dtlpy as dl
 from extractors import XLSExtractor
-import stages
+import operations
 
 class XLSProcessor(dl.BaseServiceRunner):
     def __init__(self, item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any] = None):
@@ -232,15 +232,15 @@ class XLSProcessor(dl.BaseServiceRunner):
         return data
 
     def clean(self, data):
-        data = stages.clean_text(data, self.config)
+        data = operations.clean_text(data, self.config)
         return data
 
     def chunk(self, data):
-        data = stages.chunk_text(data, self.config)
+        data = operations.chunk_text(data, self.config)
         return data
 
     def upload(self, data):
-        data = stages.upload_to_dataloop(data, self.config)
+        data = operations.upload_to_dataloop(data, self.config)
         return data
 
     def run(self):
@@ -271,11 +271,11 @@ from apps import PDFProcessor, DOCProcessor, XLSProcessor
 APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
 ```
 
-### Add a Custom Processing Stage
+### Add a Custom Processing Operation
 
-**1. Create Stage** in `stages/custom.py`:
+**1. Create Operation** in `operations/custom.py`:
 ```python
-def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def my_custom_operation(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Custom processing logic."""
     content = data.get('content', '')
     # Transform content
@@ -283,10 +283,10 @@ def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, A
     return data
 ```
 
-**2. Export** from `stages/__init__.py`:
+**2. Export** from `operations/__init__.py`:
 ```python
-from .custom import my_custom_stage
-__all__ = [..., 'my_custom_stage']
+from .custom import my_custom_operation
+__all__ = [..., 'my_custom_operation']
 ```
 
 **3. Use in App**:
@@ -294,7 +294,7 @@ __all__ = [..., 'my_custom_stage']
 # In your app's run() method
 def run(self):
     data = self.extract(data)
-    data = stages.my_custom_stage(data, self.config)  # Use your custom stage
+    data = operations.my_custom_operation(data, self.config)  # Use your custom operation
     data = self.chunk(data)
     data = self.upload(data)
     return data.get('uploaded_items', [])
@@ -322,20 +322,20 @@ apps/                       # File-type processors (proper Python package)
 
 extractors/                 # Content extraction package
 ├── __init__.py
-├── content_types.py         # ExtractedContent, ImageContent, TableContent data models
+├── data_types.py         # ExtractedContent, ImageContent, TableContent data models
 ├── mixins.py              # DataloopModelMixin for model-based extractors
 ├── pdf_extractor.py       # PDF extraction
 ├── docs_extractor.py      # DOCX extraction
 ├── ocr_extractor.py       # OCR extraction
 └── registry.py           # Extractor registry
 
-stages/                     # Pipeline interface layer
+operations/                 # Pipeline interface layer
 ├── __init__.py            # Signature: (data: dict, config: dict) -> dict
-├── chunking.py           # Chunking stages
-├── preprocessing.py       # Text cleaning stages
-├── ocr.py                # OCR stages
-├── llm.py                # LLM stages
-└── upload.py             # Upload stages
+├── chunking.py           # Chunking operations
+├── preprocessing.py       # Text cleaning operations
+├── ocr.py                # OCR operations
+├── llm.py                # LLM operations
+└── upload.py             # Upload operations
 
 utils/                       # Implementation layer
 ├── __init__.py            # Reusable infrastructure utilities
@@ -351,9 +351,9 @@ tests/                      # All tests consolidated here
 └── test_processors.py
 ```
 
-### Key Design Pattern: Stages vs Utils
+### Key Design Pattern: Operations vs Utils
 
-**Stages** (`stages/`) - Pipeline interface layer:
+**Operations** (`operations/`) - Pipeline interface layer:
 - Uniform signature: `(data: dict, config: dict) -> dict`
 - Adapts utils functions to work in composable pipelines
 - Manages the shared data dictionary that flows through pipelines

@@ -20,7 +20,7 @@ Each file type has its own **App** class that orchestrates extraction, processin
 ### 1. Apps (`apps/`)
 
 File-type specific processor classes organized as a **proper Python package**. Each app:
-- Imports and uses shared extractors and stages
+- Imports and uses shared extractors and operations
 - Orchestrates the processing pipeline
 - Includes its own Dockerfile and Dataloop manifest
 - Can be deployed independently to Dataloop platform
@@ -65,20 +65,20 @@ class PDFProcessor:
         return data
 
     def clean(self, data: dict) -> dict:
-        data = stages.clean_text(data, self.config)
-        data = stages.normalize_whitespace(data, self.config)
+        data = operations.clean_text(data, self.config)
+        data = operations.normalize_whitespace(data, self.config)
         return data
 
     def chunk(self, data: dict) -> dict:
         strategy = self.config.get('chunking_strategy', 'recursive')
         if strategy == 'recursive':
-            data = stages.chunk_recursive(data, self.config)
+            data = operations.chunk_recursive(data, self.config)
         elif strategy == 'semantic':
-            data = stages.llm_chunk_semantic(data, self.config)
+            data = operations.llm_chunk_semantic(data, self.config)
         return data
 
     def upload(self, data: dict) -> dict:
-        data = stages.upload_to_dataloop(data, self.config)
+        data = operations.upload_to_dataloop(data, self.config)
         return data
 
     def run(self) -> List[dl.Item]:
@@ -97,7 +97,7 @@ Extract multimodal content from files. Organized as a package:
 
 ```
 extractors/
-├── content_types.py     # ExtractedContent, ImageContent, TableContent data models
+├── data_types.py        # ExtractedContent, ImageContent, TableContent data models
 ├── mixins.py            # DataloopModelMixin for model-based extractors
 ├── pdf_extractor.py     # PDFExtractor
 ├── docs_extractor.py    # DocsExtractor
@@ -118,26 +118,26 @@ extractor = PDFExtractor()
 content = extractor.extract(item, config)
 ```
 
-### 3. Stages (`stages/`)
+### 3. Operations (`operations/`)
 
 **Pipeline interface layer** - Functions with standardized signature: `(data: dict, config: dict) -> dict`
 
-Stages provide a uniform interface for composable pipelines. They:
+Operations provide a uniform interface for composable pipelines. They:
 - Extract parameters from the shared `data` dictionary
 - Call utils implementation functions to do the actual work
 - Put results back into the `data` dictionary
 - Enable clean pipeline composition in app classes
 
-**Available Stages:**
+**Available Operations:**
 - **chunking.py**: `chunk_text`, `chunk_recursive_with_images`, `chunk_with_embedded_images`, `TextChunker`
 - **preprocessing.py**: `clean_text`, `normalize_whitespace`, `remove_empty_lines`
 - **ocr.py**: `ocr_enhance`, `describe_images_with_dataloop`
 - **llm.py**: `llm_chunk_semantic`, `llm_summarize`
 - **upload.py**: `upload_to_dataloop`, `upload_with_images`
 
-**Example Stage (Adapter Pattern):**
+**Example Operation (Adapter Pattern):**
 ```python
-# stages/upload.py
+# operations/upload.py
 def upload_to_dataloop(data: Dict, config: Dict) -> Dict:
     """Pipeline interface - extracts from data dict, calls utils, returns updated dict"""
     from utils.dataloop_helpers import upload_chunks  # Import utils implementation
@@ -159,7 +159,7 @@ def upload_to_dataloop(data: Dict, config: Dict) -> Dict:
 
 **Implementation layer** - Infrastructure and reusable utilities with specific signatures.
 
-Utils contains the actual implementation logic that stages call. Functions here:
+Utils contains the actual implementation logic that operations call. Functions here:
 - Have specific type signatures (not the generic `(data, config) -> data`)
 - Can be used standalone outside of pipelines
 - Contain the business logic and integrations
@@ -186,16 +186,16 @@ def upload_chunks(
     return uploaded_items
 ```
 
-**Why Separate Stages and Utils?**
+**Why Separate Operations and Utils?**
 
 This is the [**Adapter Pattern**](https://en.wikipedia.org/wiki/Adapter_pattern):
-- **Stages**: Uniform pipeline interface for composition
+- **Operations**: Uniform pipeline interface for composition
 - **Utils**: Reusable implementations that can be used anywhere
 
 Benefits:
 1. ✅ **Flexibility**: Utils functions work standalone or in pipelines
 2. ✅ **Testability**: Test utils logic separately from pipeline orchestration
-3. ✅ **Composability**: Easy to build different pipelines by mixing stages
+3. ✅ **Composability**: Easy to build different pipelines by mixing operations
 4. ✅ **Clear separation**: Pipeline interface vs. business logic
 
 ### 5. Main API (`main.py`)
@@ -232,7 +232,7 @@ To add support for a new file type (e.g., Excel):
 
 **1. Create Extractor** (`extractors/xls_extractor.py`):
 ```python
-from .content_types import ExtractedContent
+from .data_types import ExtractedContent
 import dtlpy as dl
 from typing import Dict, Any
 
@@ -265,7 +265,7 @@ import logging
 from typing import Dict, Any, List
 import dtlpy as dl
 from extractors import XLSExtractor
-import stages
+import operations
 
 class XLSApp:
     def __init__(self, item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any] = None):
@@ -281,15 +281,15 @@ class XLSApp:
         return data
 
     def clean(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        data = stages.clean_text(data, self.config)
+        data = operations.clean_text(data, self.config)
         return data
 
     def chunk(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        data = stages.chunk_recursive(data, self.config)
+        data = operations.chunk_recursive(data, self.config)
         return data
 
     def upload(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        data = stages.upload_to_dataloop(data, self.config)
+        data = operations.upload_to_dataloop(data, self.config)
         return data
 
     def run(self) -> List[dl.Item]:
@@ -323,13 +323,13 @@ from apps import PDFProcessor, DOCProcessor, XLSProcessor
 APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
 ```
 
-### Add New Stage
+### Add New Operation
 
-**Option A: Simple Stage (No Utils Implementation Needed)**
+**Option A: Simple Operation (No Utils Implementation Needed)**
 
-**1. Create Stage** (`stages/my_module.py`):
+**1. Create Operation** (`operations/my_module.py`):
 ```python
-def my_simple_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def my_simple_operation(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Pipeline interface - simple transformation"""
     content = data.get('content', '')
     # Do transformation directly
@@ -338,7 +338,7 @@ def my_simple_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, A
     return data
 ```
 
-**Option B: Stage with Utils Implementation (Recommended for Complex Logic)**
+**Option B: Operation with Utils Implementation (Recommended for Complex Logic)**
 
 **1. Create Utils Implementation** (`utils/my_helper.py`):
 ```python
@@ -348,9 +348,9 @@ def transform_text(text: str, options: dict) -> str:
     return transformed_text
 ```
 
-**2. Create Stage Adapter** (`stages/my_module.py`):
+**2. Create Operation Adapter** (`operations/my_module.py`):
 ```python
-def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def my_custom_operation(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Pipeline interface - calls utils implementation"""
     from utils.my_helper import transform_text
 
@@ -366,17 +366,17 @@ def my_custom_stage(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, A
     return data
 ```
 
-**3. Export Stage** (`stages/__init__.py`):
+**3. Export Operation** (`operations/__init__.py`):
 ```python
-from .my_module import my_custom_stage
-__all__ = [..., 'my_custom_stage']
+from .my_module import my_custom_operation
+__all__ = [..., 'my_custom_operation']
 ```
 
 **4. Use in Apps**:
 ```python
 def run(self):
     data = self.extract(data)
-    data = stages.my_custom_stage(data, self.config)  # Use it!
+    data = operations.my_custom_operation(data, self.config)  # Use it!
     data = self.chunk(data)
     return data
 ```
@@ -419,4 +419,4 @@ chunks = process_pdf(
 )
 ```
 
-All stages receive the same config dict for consistency.
+All operations receive the same config dict for consistency.

@@ -1,7 +1,7 @@
 """
 DOC/DOCX processor app.
 
-Uses existing extractors and stages from the repo for processing Word documents.
+Uses existing extractors and operations from the repo for processing Word documents.
 """
 
 import logging
@@ -10,7 +10,7 @@ import dtlpy as dl
 
 # Import shared repo utilities
 from extractors import DocsExtractor
-import stages
+import operations
 from utils.dataloop_helpers import upload_chunks
 from utils.chunk_metadata import ChunkMetadata
 
@@ -68,8 +68,8 @@ class DOCProcessor(dl.BaseServiceRunner):
     def clean(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Clean and normalize text."""
         logger.info("Cleaning text")
-        data = stages.clean_text(data, self.config)
-        data = stages.normalize_whitespace(data, self.config)
+        data = operations.clean_text(data, self.config)
+        data = operations.normalize_whitespace(data, self.config)
         return data
 
     def chunk(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -85,19 +85,19 @@ class DOCProcessor(dl.BaseServiceRunner):
         if strategy == 'recursive' and has_images:
             if embed_images:
                 logger.info("Using embedded image chunking")
-                data = stages.chunk_with_embedded_images(data, self.config)
+                data = operations.chunk_with_embedded_images(data, self.config)
             elif link_images:
                 logger.info("Using image-linked chunking")
-                data = stages.chunk_recursive_with_images(data, self.config)
+                data = operations.chunk_recursive_with_images(data, self.config)
             else:
                 # Standard recursive chunking without image association
-                data = stages.chunk_text(data, self.config)
+                data = operations.chunk_text(data, self.config)
         elif strategy == 'semantic':
             # Semantic chunking uses LLM
-            data = stages.llm_chunk_semantic(data, self.config)
+            data = operations.llm_chunk_semantic(data, self.config)
         else:
             # Use unified chunk_text for all other strategies
-            data = stages.chunk_text(data, self.config)
+            data = operations.chunk_text(data, self.config)
 
         chunk_count = len(data.get('chunks', []))
         embedded_count = sum(1 for m in data.get('chunk_metadata', []) if m.get('has_embedded_images', False))
@@ -129,7 +129,7 @@ class DOCProcessor(dl.BaseServiceRunner):
             data = self._upload_chunks_with_metadata(data, self.config)
         else:
             # Standard upload
-            data = stages.upload_to_dataloop(data, self.config)
+            data = operations.upload_to_dataloop(data, self.config)
 
         uploaded_count = len(data.get('uploaded_items', []))
         logger.info(f"Uploaded {uploaded_count} chunks")
