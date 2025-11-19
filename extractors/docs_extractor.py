@@ -7,7 +7,7 @@ import os
 from typing import List, Dict, Any
 import dtlpy as dl
 from docx import Document
-from .content_types import ExtractedContent, ImageContent, TableContent
+from .data_types import ExtractedContent, ImageContent, TableContent
 
 
 class DocsExtractor:

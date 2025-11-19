@@ -5,7 +5,7 @@ All functions follow signature: (data: dict, config: dict) -> dict
 
 from typing import Dict, Any
 import re
-from utils.text_cleaning import clean_text as deep_clean
+from operations.text_cleaning import clean_text as deep_clean
 
 
 def clean_text(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:

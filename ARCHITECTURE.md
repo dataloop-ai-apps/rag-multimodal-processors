@@ -131,6 +131,7 @@ Operations provide a uniform interface for composable pipelines. They:
 **Available Operations:**
 - **chunking.py**: `chunk_text`, `chunk_recursive_with_images`, `chunk_with_embedded_images`, `TextChunker`
 - **preprocessing.py**: `clean_text`, `normalize_whitespace`, `remove_empty_lines`
+- **text_cleaning.py**: `clean_text()` using unstructured.io library (used by preprocessing operations)
 - **ocr.py**: `ocr_enhance`, `describe_images_with_dataloop`
 - **llm.py**: `llm_chunk_semantic`, `llm_summarize`
 - **upload.py**: `upload_to_dataloop`, `upload_with_images`
@@ -166,7 +167,6 @@ Utils contains the actual implementation logic that operations call. Functions h
 
 **Available Modules:**
 - **dataloop_helpers.py**: `upload_chunks()`, `upload_images()`, `get_or_create_target_dataset()`
-- **text_cleaning.py**: `clean_text()` using unstructured.io library
 - **chunk_metadata.py**: `ChunkMetadata` class for standardized metadata
 - **dataloop_model_executor.py**: `DataloopModelExecutor` base class for model execution
 

@@ -333,6 +333,7 @@ operations/                 # Pipeline interface layer
 ├── __init__.py            # Signature: (data: dict, config: dict) -> dict
 ├── chunking.py           # Chunking operations
 ├── preprocessing.py       # Text cleaning operations
+├── text_cleaning.py      # Deep text cleaning (used by preprocessing)
 ├── ocr.py                # OCR operations
 ├── llm.py                # LLM operations
 └── upload.py             # Upload operations
@@ -340,7 +341,6 @@ operations/                 # Pipeline interface layer
 utils/                       # Implementation layer
 ├── __init__.py            # Reusable infrastructure utilities
 ├── dataloop_helpers.py   # Upload/dataset helpers
-├── text_cleaning.py      # Deep text cleaning
 ├── chunk_metadata.py     # Metadata models
 └── dataloop_model_executor.py  # Model execution
 

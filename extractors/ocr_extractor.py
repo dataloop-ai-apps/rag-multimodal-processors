@@ -11,7 +11,7 @@ import tempfile
 import easyocr
 from typing import Optional, List, Dict, Any
 from .mixins import DataloopModelMixin
-from .content_types import ExtractedContent
+from .data_types import ExtractedContent
 
 logger = logging.getLogger("rag-preprocessor")
 

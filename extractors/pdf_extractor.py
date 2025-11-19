@@ -9,7 +9,7 @@ from fitz import Document
 import pymupdf4llm
 from typing import List, Dict, Any
 import dtlpy as dl
-from .content_types import ExtractedContent, ImageContent
+from .data_types import ExtractedContent, ImageContent
 
 
 class PDFExtractor:
