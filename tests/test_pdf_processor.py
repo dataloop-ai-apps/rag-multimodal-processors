@@ -13,15 +13,14 @@ import sys
 import traceback
 import dtlpy as dl
 from apps.pdf_processor.pdf_processor import PDFProcessor
-from tests.test_config import TEST_ITEMS, PDF_CONFIG as CONFIG
+from tests.test_config import TEST_ITEMS, DESTINATION_DATASET_ID, PDF_CONFIG as CONFIG
 
-# Get test items for PDF tests
+# Get test item configuration
 if 'pdf' not in TEST_ITEMS:
     raise ValueError("'pdf' test configuration not found in TEST_ITEMS. Please add it to tests/test_config.py")
-if 'dataset' not in TEST_ITEMS:
-    raise ValueError("'dataset' entry not found in TEST_ITEMS. Please add it to tests/test_config.py")
+
 ITEM_ID = TEST_ITEMS['pdf']['item_id']
-TARGET_DATASET_ID = TEST_ITEMS['dataset']['dataset_id']
+TARGET_DATASET_ID = DESTINATION_DATASET_ID
 
 
 # ============================================================
@@ -67,33 +66,22 @@ def test_pdf_processor():
     try:
         item = dl.items.get(item_id=item_id)
         print(f"✅ Retrieved: {item.name} ({item.mimetype})")
+        print(f"   Source dataset: {item.dataset.name} (ID: {item.dataset.id})")
     except Exception as e:
         print(f"❌ Failed to retrieve item: {str(e)}")
         raise
 
-    # Get or create target dataset
-    print(f"\n📦 Setting up target dataset...")
-    if target_dataset_id:
-        try:
-            target_dataset = dl.datasets.get(dataset_id=target_dataset_id)
-            print(f"✅ Using specified dataset: {target_dataset.name} (ID: {target_dataset.id})")
-        except Exception as e:
-            print(f"❌ Failed to get target dataset: {str(e)}")
-            raise
-    else:
-        # Auto-create chunks dataset
-        original_dataset_name = item.dataset.name
-        new_dataset_name = f"{original_dataset_name}_chunks"
-        print(f"📝 Auto-creating dataset: {new_dataset_name}")
+    # Get destination dataset (REQUIRED)
+    print(f"\n📦 Setting up destination dataset...")
+    if not target_dataset_id:
+        raise ValueError("DESTINATION_DATASET_ID is required. Please set it in tests/test_config.py")
 
-        try:
-            # Try to get existing dataset
-            target_dataset = item.project.datasets.get(dataset_name=new_dataset_name)
-            print(f"✅ Using existing chunks dataset: {target_dataset.name} (ID: {target_dataset.id})")
-        except dl.exceptions.NotFound:
-            # Create new dataset
-            target_dataset = item.project.datasets.create(dataset_name=new_dataset_name)
-            print(f"✅ Created new dataset: {target_dataset.name} (ID: {target_dataset.id})")
+    try:
+        target_dataset = dl.datasets.get(dataset_id=target_dataset_id)
+        print(f"✅ Using destination dataset: {target_dataset.name} (ID: {target_dataset.id})")
+    except Exception as e:
+        print(f"❌ Failed to get destination dataset: {str(e)}")
+        raise
 
     # Show configuration
     print(f"\n📋 Configuration:")

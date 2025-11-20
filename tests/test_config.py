@@ -7,35 +7,14 @@ Edit the values below to configure your test runs.
 # ============================================================
 # TEST ITEMS AND DATASETS
 # ============================================================
-# Organize test items by test type/app
-# The 'dataset' entry contains the shared target dataset ID
-# Each test type entry (pdf, doc, etc.) contains the item ID for that test
-
+# Test items (source dataset is obtained from item.dataset)
 TEST_ITEMS = {
-    "dataset": {'dataset_id': "691344d0a235b51330ed5951"},  # Dataloop Demo 2025 - rag preprorcess testing
-    'pdf': {'item_id': "6913452e732d419b5da2dc9c"},  # PDF file item ID
-    'doc': {'item_id': "6913452dd4c1299c678a452a"},  # DOC/DOCX file item ID
+    'pdf': {'item_id': "6913452e732d419b5da2dc9c"},
+    'doc': {'item_id': "6913452dd4c1299c678a452a"},
 }
 
-
-# Convenience accessors (for backward compatibility and easier access)
-def get_test_item(test_type: str) -> str:
-    """Get item ID for a specific test type."""
-    if test_type not in TEST_ITEMS:
-        raise ValueError(f"Test type '{test_type}' not found in TEST_ITEMS. Available: {list(TEST_ITEMS.keys())}")
-    return TEST_ITEMS[test_type].get('item_id', "item_id_to_test")
-
-
-def get_test_dataset() -> str:
-    """Get dataset ID from the shared 'dataset' entry."""
-    if 'dataset' not in TEST_ITEMS:
-        raise ValueError("'dataset' entry not found in TEST_ITEMS. Please add it to tests/test_config.py")
-    return TEST_ITEMS['dataset'].get('dataset_id', "dataset_id_to_store_chunks")
-
-
-# Legacy support (deprecated - use TEST_ITEMS instead)
-ITEM_ID = TEST_ITEMS.get('pdf', {}).get('item_id', "item_id_to_test")
-TARGET_DATASET_ID = TEST_ITEMS.get('dataset', {}).get('dataset_id', "dataset_id_to_store_chunks")
+# Destination dataset where chunks will be uploaded (REQUIRED)
+DESTINATION_DATASET_ID = "691344d0a235b51330ed5951"  # Dataloop Demo 2025 - rag preprocess testing
 
 # ============================================================
 # PDF TEST CONFIGURATION
