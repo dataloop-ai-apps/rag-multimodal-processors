@@ -201,7 +201,7 @@
               "widget": "dl-slider"
             },
             {
-              "name": "to_correct_spelling",
+              "name": "correct_spelling",
               "title": "Apply Text Cleaning",
               "props": {
                 "type": "boolean",

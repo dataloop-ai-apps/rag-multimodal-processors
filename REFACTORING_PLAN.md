@@ -53,9 +53,8 @@ rag-multimodal-processors/
 
 #### Changes Required
 1. **Standardize metadata keys across all processors:**
-   - `parent_data` → `source_item`
-   - `source_data` → `source_item`
-   - `original_file` → `source_file`
+   - original item ID → `source_item_id`
+   - original item name → `source_item_name`
 
 2. **Convert ChunkMetadata to dataclass:**
 ```python

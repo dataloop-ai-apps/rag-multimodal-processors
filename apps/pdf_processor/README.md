@@ -1,20 +1,28 @@
 # PDF Processor
 
-A Dataloop application that extracts text from PDF documents, applies OCR to images, and creates chunks for Retrieval-Augmented Generation (RAG) workflows.
+A modular Dataloop application for processing PDF files into RAG-ready chunks with ML-enhanced extraction and flexible OCR.
 
 ## 🎯 Features
 
 ### Text Extraction
-- **Plain Text**: Fast extraction using PyMuPDF (fitz)
-- **Markdown-Aware**: Preserves document structure (headers, lists, tables) using `pymupdf4llm`
+- **Plain Text**: Standard extraction using PyMuPDF (fitz)
+- **ML-Enhanced Markdown**: PyMuPDF Layout for improved structure preservation
+  - ML-based layout analysis
+  - Intelligent OCR evaluation (uses Tesseract when beneficial)
+  - Better header/footer detection
+  - Improved multi-column and table handling
+
+### Chunk Upload
+- **Bulk Upload**: Upload all chunks in a single operation using pandas DataFrame
+- **Per-Chunk Metadata**: Track page numbers, images, extraction method per chunk
+- **Resilient Fallback**: Automatic retry with individual uploads if needed
 
 ### OCR from Images
 Extract embedded images and apply OCR to extract text:
 
-- ✅ Local processing, no upload required
-- ✅ Processes images as temporary files
-- ✅ No Dataloop items created
-- ✅ Fast and efficient text extraction
+- **Flexible OCR Backends**: Dataloop models, EasyOCR fallback, or Tesseract via PyMuPDF Layout
+- **Local Processing**: Images processed as temporary files without creating Dataloop items
+- **Multiple Integration Methods**: Choose how OCR text integrates with document text
 
 **OCR Integration Methods**
 - `append_to_page`: Attaches OCR text to corresponding page (maintains structure)
@@ -126,18 +134,25 @@ Each chunk includes comprehensive metadata for provenance tracking:
 ```json
 {
   "user": {
-    "document": "example.pdf",
-    "document_type": "application/pdf",
-    "total_pages": 25,
+    "source_item_id": "65f2a3b4c1e2d3f4a5b6c7d8",
+    "source_file": "example.pdf",
+    "source_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
+    "chunk_index": 0,
     "total_chunks": 120,
-    "extraction_method": "pymupdf4llm",
-    "extraction_format": "markdown",
-    "chunking_strategy": "recursive",
-    "markdown_aware_splitting": true,
     "extracted_chunk": true,
-    "original_item_id": "65f2a3b4c1e2d3f4a5b6c7d8",
-    "original_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
-    "processing_timestamp": 1698765432.123
+    "processing_timestamp": 1698765432.123,
+    "processor": "pdf",
+    "extraction_method": "pymupdf4llm_layout",
+    "layout_enhancement": true,
+    "page_numbers": [1, 2],
+    "image_ids": ["img_id_1", "img_id_2"]
   }
 }
 ```
+
+**Key Metadata Fields:**
+- `extraction_method`: `"pymupdf4llm_layout"` (ML-enhanced) or `"pymupdf4llm"` (standard) or `"pymupdf"` (plain text)
+- `layout_enhancement`: `true` if PyMuPDF Layout was active during extraction
+- `page_numbers`: List of source pages for this chunk
+- `image_ids`: IDs of associated images (if any)
+- `chunk_index` / `total_chunks`: Position in document for reconstruction

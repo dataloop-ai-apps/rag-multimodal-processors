@@ -3,98 +3,147 @@ Shared metadata management for chunk items across all processors.
 Provides a standardized way to create and manage metadata for document chunks.
 """
 
-import dtlpy as dl
 import time
-from typing import Dict, Any, List
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any
+import dtlpy as dl
 
 
+@dataclass
 class ChunkMetadata:
     """
-    Shared metadata class for all document processors.
-    Creates standardized metadata structure with base fields common to all chunks
-    and processor-specific fields.
+    Standardized chunk metadata with validation.
+
+    This dataclass provides a standardized structure for chunk metadata
+    across all document processors, with validation at instantiation.
     """
 
-    @staticmethod
-    def create(
-        original_item: dl.Item,
-        total_chunks: int,
-        processor_specific_metadata: Dict[str, Any] = None,
-        chunk_index: int = None,
-        page_numbers: List[int] = None,
-        image_ids: List[str] = None,
-    ) -> Dict[str, Any]:
+    # Required fields
+    source_item_id: str
+    source_file: str
+    source_dataset_id: str
+    chunk_index: int
+    total_chunks: int
+
+    # Optional fields
+    page_numbers: Optional[List[int]] = None
+    image_ids: Optional[List[str]] = None
+    bbox: Optional[tuple] = None
+    processing_timestamp: float = field(default_factory=time.time)
+    processor: Optional[str] = None
+    extraction_method: Optional[str] = None
+    processor_specific_metadata: Optional[Dict[str, Any]] = None
+
+    def __post_init__(self):
+        """Validate required fields at instantiation."""
+        if not self.source_item_id:
+            raise ValueError("source_item_id is required")
+        if not self.source_file:
+            raise ValueError("source_file is required")
+        if not self.source_dataset_id:
+            raise ValueError("source_dataset_id is required")
+        if self.chunk_index < 0:
+            raise ValueError("chunk_index must be non-negative")
+        if self.total_chunks < 1:
+            raise ValueError("total_chunks must be at least 1")
+
+    def to_dict(self) -> Dict[str, Any]:
         """
-        Create standardized metadata for chunk items.
-
-        This method creates a base metadata structure that is common across all
-        document processors, and allows each processor to add its own specific
-        metadata on top of the base fields.
-
-        Args:
-            original_item (dl.Item): Original document item that was processed
-            total_chunks (int): Total number of chunks created from the document
-            processor_specific_metadata (Dict[str, Any], optional): Additional metadata
-                specific to the processor (e.g., OCR settings, extraction method, etc.)
-            chunk_index (int, optional): Index of this chunk (0-based)
-            page_numbers (List[int], optional): Page numbers this chunk spans
-            image_ids (List[str], optional): IDs of associated image items
+        Convert to dictionary format compatible with Dataloop metadata structure.
 
         Returns:
-            Dict[str, Any]: Complete metadata structure with base and processor-specific fields
-
-        Example:
-            >>> processor_metadata = {
-            ...     'extraction_method': 'pymupdf4llm',
-            ...     'total_pages': 10,
-            ...     'chunking_strategy': 'recursive'
-            ... }
-            >>> metadata = ChunkMetadata.create(
-            ...     item, 50, processor_metadata,
-            ...     chunk_index=0, page_numbers=[1, 2], image_ids=['img_id_1']
-            ... )
+            Dict[str, Any]: Metadata in Dataloop format {'user': {...}}
         """
-        # Base metadata common to all chunks from all processors
         base_metadata = {
-            'document': original_item.name,
-            'document_type': original_item.mimetype,
-            'total_chunks': total_chunks,
+            'source_item_id': self.source_item_id,
+            'source_file': self.source_file,
+            'source_dataset_id': self.source_dataset_id,
+            'chunk_index': self.chunk_index,
+            'total_chunks': self.total_chunks,
             'extracted_chunk': True,
-            'original_item_id': original_item.id,
-            'original_dataset_id': original_item.dataset.id,
-            'processing_timestamp': time.time(),
+            'processing_timestamp': self.processing_timestamp,
         }
 
-        # Add chunk-specific metadata if provided
-        if chunk_index is not None:
-            base_metadata['chunk_index'] = chunk_index
-        if page_numbers:
-            base_metadata['page_numbers'] = page_numbers
-        if image_ids:
-            base_metadata['image_ids'] = image_ids
+        # Add optional fields if present
+        if self.page_numbers:
+            base_metadata['page_numbers'] = self.page_numbers
+        if self.image_ids:
+            base_metadata['image_ids'] = self.image_ids
+        if self.bbox:
+            base_metadata['bbox'] = self.bbox
+        if self.processor:
+            base_metadata['processor'] = self.processor
+        if self.extraction_method:
+            base_metadata['extraction_method'] = self.extraction_method
 
         # Merge processor-specific metadata if provided
-        if processor_specific_metadata:
-            base_metadata.update(processor_specific_metadata)
+        if self.processor_specific_metadata:
+            base_metadata.update(self.processor_specific_metadata)
 
         # Return in Dataloop's metadata structure format
         return {'user': base_metadata}
 
+    @classmethod
+    def create(
+        cls,
+        source_item: dl.Item,
+        total_chunks: int,
+        chunk_index: Optional[int] = None,
+        processor_specific_metadata: Optional[Dict[str, Any]] = None,
+        page_numbers: Optional[List[int]] = None,
+        image_ids: Optional[List[str]] = None,
+        processor: Optional[str] = None,
+        extraction_method: Optional[str] = None,
+    ) -> 'ChunkMetadata':
+        """
+        Create ChunkMetadata instance from Dataloop item.
+
+        Args:
+            source_item: Source document item that was processed
+            total_chunks: Total number of chunks created from the document
+            chunk_index: Index of this chunk (0-based)
+            processor_specific_metadata: Additional metadata specific to the processor
+            page_numbers: Page numbers this chunk spans
+            image_ids: IDs of associated image items
+            processor: Processor name (e.g., 'pdf', 'doc')
+            extraction_method: Extraction method used (e.g., 'pymupdf', 'pymupdf4llm')
+
+        Returns:
+            ChunkMetadata: Instance with all fields populated
+        """
+
+        # If chunk_index not provided, use 0 as default (for bulk uploads without per-chunk metadata)
+        if chunk_index is None:
+            chunk_index = 0
+
+        return cls(
+            source_item_id=source_item.id,
+            source_file=source_item.name,
+            source_dataset_id=source_item.dataset.id,
+            chunk_index=chunk_index,
+            total_chunks=total_chunks,
+            page_numbers=page_numbers,
+            image_ids=image_ids,
+            processor=processor,
+            extraction_method=extraction_method,
+            processor_specific_metadata=processor_specific_metadata,
+        )
+
     @staticmethod
-    def get_base_fields() -> list:
+    def get_base_fields() -> List[str]:
         """
         Get list of base metadata field names that are common to all chunks.
 
         Returns:
-            list: Field names that are always present in chunk metadata
+            List[str]: Field names that are always present in chunk metadata
         """
         return [
-            'document',
-            'document_type',
+            'source_item_id',
+            'source_file',
+            'source_dataset_id',
+            'chunk_index',
             'total_chunks',
             'extracted_chunk',
-            'original_item_id',
-            'original_dataset_id',
             'processing_timestamp',
         ]
 
@@ -104,19 +153,21 @@ class ChunkMetadata:
         Validate that metadata contains all required base fields.
 
         Args:
-            metadata (Dict[str, Any]): Metadata dictionary to validate
+            metadata: Metadata dictionary to validate (can be raw dict or Dataloop format)
 
         Returns:
             bool: True if all base fields are present, False otherwise
         """
-        if 'user' not in metadata:
-            return False
+        # Handle Dataloop format {'user': {...}}
+        if 'user' in metadata:
+            user_metadata = metadata['user']
+        else:
+            user_metadata = metadata
 
-        user_metadata = metadata['user']
         base_fields = ChunkMetadata.get_base_fields()
 
-        for field in base_fields:
-            if field not in user_metadata:
+        for field_name in base_fields:
+            if field_name not in user_metadata:
                 return False
 
         return True

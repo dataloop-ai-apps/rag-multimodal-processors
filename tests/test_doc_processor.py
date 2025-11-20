@@ -10,6 +10,7 @@ Usage:
 """
 
 import sys
+import traceback
 import dtlpy as dl
 from apps.doc_processor.doc_processor import DOCProcessor
 from tests.test_config import TEST_ITEMS, DOC_CONFIG as CONFIG
@@ -132,8 +133,6 @@ def test_doc_processor():
 
     except Exception as e:
         print(f"\n❌ Failed: {str(e)}")
-        import traceback
-
         traceback.print_exc()
         raise
 

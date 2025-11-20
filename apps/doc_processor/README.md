@@ -1,6 +1,6 @@
 # DOC Processor
 
-A Dataloop application that extracts text, tables, and images from DOC/DOCX documents and creates chunks for Retrieval-Augmented Generation (RAG) workflows.
+A modular Dataloop application for processing DOCX files into RAG-ready chunks with support for text, tables, and images.
 
 ## 🎯 Features
 
@@ -8,6 +8,11 @@ A Dataloop application that extracts text, tables, and images from DOC/DOCX docu
 - **Paragraph Extraction**: Extracts all text paragraphs from DOCX files using `python-docx`
 - **Table Extraction**: Optional extraction of tables as markdown format
 - **Image Extraction**: Optional extraction of embedded images
+
+### Chunk Upload
+- **Bulk Upload**: Upload all chunks in a single operation using pandas DataFrame
+- **Per-Chunk Metadata**: Track images and extraction details per chunk
+- **Resilient Fallback**: Automatic retry with individual uploads if needed
 
 ### Text Chunking
 Multiple strategies for optimal embedding:
@@ -98,18 +103,16 @@ Each chunk includes comprehensive metadata for provenance tracking:
 ```json
 {
   "user": {
-    "document": "example.docx",
-    "document_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "paragraph_count": 45,
-    "table_count": 3,
-    "image_count": 5,
-    "extraction_method": "python-docx",
-    "extraction_format": "plain",
-    "chunking_strategy": "recursive",
+    "source_item_id": "65f2a3b4c1e2d3f4a5b6c7d8",
+    "source_file": "example.docx",
+    "source_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
+    "chunk_index": 0,
+    "total_chunks": 45,
     "extracted_chunk": true,
-    "original_item_id": "65f2a3b4c1e2d3f4a5b6c7d8",
-    "original_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
-    "processing_timestamp": 1698765432.123
+    "processing_timestamp": 1698765432.123,
+    "processor": "doc",
+    "extraction_method": "python-docx",
+    "image_ids": ["img_id_1", "img_id_2", "img_id_3", "img_id_4", "img_id_5"]
   }
 }
 ```

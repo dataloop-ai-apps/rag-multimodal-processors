@@ -1,11 +1,21 @@
 # RAG Document Processors
 
-Dataloop-based processors for converting **PDF and DOC files** into RAG-ready chunks. Each file type has its own app that uses shared utilities for extraction, processing, and upload.
+Modular, extensible processors for converting **PDF and DOC files** into RAG-ready chunks. Built on Dataloop with a simple pipeline architecture that makes adding new file types straightforward.
 
 ## Supported File Types
 
-- **PDF** (.pdf) - Text extraction with optional OCR
-- **Microsoft Word** (.docx) - Document processing
+- **PDF** (.pdf) - ML-enhanced text extraction with PyMuPDF Layout, optional OCR
+- **Microsoft Word** (.docx) - Document processing with tables and images
+
+## Key Features
+
+🧩 **Modular Architecture** - Clean separation between apps, transforms, and utilities
+📁 **Easy File Type Addition** - Add new processors in minutes with consistent patterns
+🔄 **Pipeline Design** - Simple extract → clean → chunk → upload flow
+🎯 **Static Methods** - Composable processing steps with no instance dependencies
+🔍 **Flexible OCR** - Dataloop models, EasyOCR fallback, or Tesseract via pymupdf-layout
+📊 **Multiple Chunking Strategies** - Recursive, semantic, sentence, paragraph
+🏷️ **Rich Metadata** - Track page numbers, images, and extraction details per chunk
 
 ## Quick Start
 
@@ -161,209 +171,192 @@ chunks = process_pdf(
 
 ## Testing
 
-Tests use real Dataloop items. Edit `tests/test_config.py` with your item IDs:
+Basic test suite included. See [tests/README.md](tests/README.md) for configuration details.
 
-```python
-# In tests/test_config.py
-TEST_ITEMS = {
-    'pdf': {'item_id': 'your-pdf-item-id'},
-    'dataset': {'dataset_id': 'your-dataset-id'},
-}
-```
+## Adding New File Types
 
-Then run:
+The modular architecture makes it straightforward to add support for new file types. Each processor follows the same simple pattern:
 
-```bash
-python tests/test_pdf.py       # Test PDF processing
-python tests/test_doc.py       # Test .docx processing
-```
+### Example: Adding Excel Support
 
-See [tests/README.md](tests/README.md) for details.
-
-## Extension
-
-### Add a New File Type
-
-To add support for a new file type (e.g., Excel):
-
-**1. Create Extractor** in `extractors/xls_extractor.py`:
-```python
-from .data_types import ExtractedContent
-import dtlpy as dl
-from typing import Dict, Any
-
-class XLSExtractor:
-    def __init__(self):
-        self.mime_type = 'application/vnd.ms-excel'
-        self.name = 'XLS'
-
-    def extract(self, item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
-        # Your extraction logic
-        return ExtractedContent(text=extracted_text)
-```
-
-Then register it in `extractors/registry.py`:
-```python
-from .xls_extractor import XLSExtractor
-
-EXTRACTOR_REGISTRY['application/vnd.ms-excel'] = XLSExtractor
-```
-
-**2. Create App** in `apps/xls_processor/xls_processor.py`:
+**1. Create App** in `apps/xls_processor/xls_processor.py`:
 ```python
 import logging
+import tempfile
 from typing import Dict, Any, List
 import dtlpy as dl
-from extractors import XLSExtractor
-import operations
+import openpyxl  # Example: Excel library
+from utils.data_types import ExtractedContent
+import transforms
 
 class XLSProcessor(dl.BaseServiceRunner):
-    def __init__(self, item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any] = None):
-        super().__init__()
+    def __init__(self, item=None, target_dataset=None, config=None):
         self.item = item
         self.target_dataset = target_dataset
         self.config = config or {}
-        self.extractor = XLSExtractor()
-        self.logger = logging.getLogger(f"XLSProcessor.{item.id[:8]}")
+        self.logger = logging.getLogger("XLSProcessor")
 
-    def extract(self, data):
-        extracted = self.extractor.extract(self.item, self.config)
-        data.update(extracted.to_dict())
+    @staticmethod
+    def extract(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract text from Excel file."""
+        item = data.get('item')
+        with tempfile.TemporaryDirectory() as temp_dir:
+            file_path = item.download(local_path=temp_dir)
+            workbook = openpyxl.load_workbook(file_path)
+
+            # Extract all text from all sheets
+            all_text = []
+            for sheet in workbook.worksheets:
+                for row in sheet.iter_rows(values_only=True):
+                    row_text = ' '.join([str(cell) for cell in row if cell])
+                    all_text.append(row_text)
+
+            result = ExtractedContent(
+                text='\n'.join(all_text),
+                metadata={'processor': 'xls', 'sheet_count': len(workbook.worksheets)}
+            )
+            data.update(result.to_dict())
         return data
 
-    def clean(self, data):
-        data = operations.clean_text(data, self.config)
-        return data
+    @staticmethod
+    def clean(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        return transforms.clean_text(data, config)
 
-    def chunk(self, data):
-        data = operations.chunk_text(data, self.config)
-        return data
+    @staticmethod
+    def chunk(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        return transforms.chunk_text(data, config)
 
-    def upload(self, data):
-        data = operations.upload_to_dataloop(data, self.config)
-        return data
+    @staticmethod
+    def upload(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        return transforms.upload_to_dataloop(data, config)
 
-    def run(self):
+    def run(self) -> List[dl.Item]:
         data = {'item': self.item, 'target_dataset': self.target_dataset}
-        data = self.extract(data)
-        data = self.clean(data)
-        data = self.chunk(data)
-        data = self.upload(data)
+        data = XLSProcessor.extract(data, self.config)
+        data = XLSProcessor.clean(data, self.config)
+        data = XLSProcessor.chunk(data, self.config)
+        data = XLSProcessor.upload(data, self.config)
         return data.get('uploaded_items', [])
 ```
 
-**3. Create Package Structure** `apps/xls_processor/__init__.py`:
+**2. Create Package Structure** `apps/xls_processor/__init__.py`:
 ```python
 from .xls_processor import XLSProcessor
 __all__ = ['XLSProcessor']
 ```
 
-**4. Export from Apps Package** `apps/__init__.py`:
+**3. Export from Apps Package** `apps/__init__.py`:
 ```python
 from .xls_processor.xls_processor import XLSProcessor
 __all__ = [..., 'XLSProcessor']
 ```
 
-**5. Register App** in `main.py`:
+**4. Register App** in `main.py`:
 ```python
 from apps import PDFProcessor, DOCProcessor, XLSProcessor
 
 APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
 ```
 
-### Add a Custom Processing Operation
+That's it! Your new processor is ready to use with the same pipeline pattern as existing processors.
 
-**1. Create Operation** in `operations/custom.py`:
+### Add a Custom Transform
+
+**1. Create Transform** in `transforms/custom.py`:
 ```python
-def my_custom_operation(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def my_custom_transform(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Custom processing logic."""
     content = data.get('content', '')
     # Transform content
-    data['content'] = transformed_content
+    processed = content.upper()  # Example transformation
+    data['content'] = processed
     return data
 ```
 
-**2. Export** from `operations/__init__.py`:
+**2. Export** from `transforms/__init__.py`:
 ```python
-from .custom import my_custom_operation
-__all__ = [..., 'my_custom_operation']
+from .custom import my_custom_transform
+__all__ = [..., 'my_custom_transform']
 ```
 
 **3. Use in App**:
 ```python
 # In your app's run() method
 def run(self):
+    data = {'item': self.item, 'target_dataset': self.target_dataset}
     data = self.extract(data)
-    data = operations.my_custom_operation(data, self.config)  # Use your custom operation
+    data = transforms.my_custom_transform(data, self.config)  # Use your custom transform
     data = self.chunk(data)
     data = self.upload(data)
     return data.get('uploaded_items', [])
 ```
 
+The uniform `(data, config) -> data` signature makes transforms composable and interchangeable.
+
 ## Architecture
 
-The system uses an **app-based architecture** with clean separation of concerns:
+The system uses a **modular app-based architecture** where each file type is a self-contained processor that follows a simple pipeline pattern:
 
 ```
-main.py                     # Entry point - routes to apps via registry
+main.py                     # Entry point - routes to apps by MIME type
 
-apps/                       # File-type processors (proper Python package)
+apps/                       # File-type processors (modular, independent)
 ├── __init__.py            # Exports PDFProcessor, DOCProcessor
 ├── pdf_processor/
 │   ├── __init__.py
-│   ├── pdf_processor.py   # PDFProcessor class
+│   ├── pdf_processor.py   # PDFProcessor with static pipeline methods
 │   ├── dataloop.json
 │   └── Dockerfile
 └── doc_processor/
     ├── __init__.py
-    ├── doc_processor.py   # DOCProcessor class
+    ├── doc_processor.py   # DOCProcessor with static pipeline methods
     ├── dataloop.json
     └── Dockerfile
 
-extractors/                 # Content extraction package
+transforms/                 # Reusable pipeline transformations
+├── __init__.py            # Uniform signature: (data, config) -> data
+├── chunking.py           # Chunking strategies (recursive, semantic, etc.)
+├── preprocessing.py       # Text cleaning and normalization
+├── text_cleaning.py      # Deep text cleaning utilities
+├── ocr.py                # OCR transformation operations
+├── llm.py                # LLM-based transformations
+└── upload.py             # Upload with per-chunk metadata
+
+utils/                      # Shared utilities and data models
 ├── __init__.py
-├── data_types.py         # ExtractedContent, ImageContent, TableContent data models
-├── mixins.py              # DataloopModelMixin for model-based extractors
-├── pdf_extractor.py       # PDF extraction
-├── docs_extractor.py      # DOCX extraction
-├── ocr_extractor.py       # OCR extraction
-└── registry.py           # Extractor registry
-
-operations/                 # Pipeline interface layer
-├── __init__.py            # Signature: (data: dict, config: dict) -> dict
-├── chunking.py           # Chunking operations
-├── preprocessing.py       # Text cleaning operations
-├── text_cleaning.py      # Deep text cleaning (used by preprocessing)
-├── ocr.py                # OCR operations
-├── llm.py                # LLM operations
-└── upload.py             # Upload operations
-
-utils/                       # Implementation layer
-├── __init__.py            # Reusable infrastructure utilities
-├── dataloop_helpers.py   # Upload/dataset helpers
-├── chunk_metadata.py     # Metadata models
-└── dataloop_model_executor.py  # Model execution
-
-tests/                      # All tests consolidated here
-├── test_pdf.py
-├── test_doc.py
-├── test_integration.py
-└── test_processors.py
+├── dataloop_helpers.py   # Upload helpers and Dataloop integrations
+├── chunk_metadata.py     # ChunkMetadata dataclass with validation
+├── data_types.py         # ExtractedContent, ImageContent, TableContent
+├── ocr_utils.py          # OCR utilities with multiple backends
+└── dataloop_model_executor.py  # Model execution wrapper
 ```
 
-### Key Design Pattern: Operations vs Utils
+### Key Design Patterns
 
-**Operations** (`operations/`) - Pipeline interface layer:
-- Uniform signature: `(data: dict, config: dict) -> dict`
-- Adapts utils functions to work in composable pipelines
-- Manages the shared data dictionary that flows through pipelines
+**Static Methods** - All pipeline steps are static for simple composition:
+```python
+# No instance needed - clean functional style
+PDFProcessor.extract(data, config)
+PDFProcessor.clean(data, config)
+PDFProcessor.chunk(data, config)
+PDFProcessor.upload(data, config)
+```
 
-**Utils** (`utils/`) - Implementation layer:
-- Specific type signatures for reusable functions
-- Contains business logic and integrations
-- Can be used standalone outside of pipelines
+**Transforms Layer** - Uniform interface makes operations composable:
+- Signature: `(data: dict, config: dict) -> dict`
+- Share data through a dictionary pipeline
+- Mix and match transforms easily
+- Add new transforms without changing apps
 
-This **Adapter Pattern** provides flexibility, testability, and composability.
+**Data Flow** - Simple dictionary-based pipeline:
+```python
+data = {'item': item, 'target_dataset': dataset}
+data = extract(data, config)   # Adds 'text', 'images', 'metadata'
+data = clean(data, config)     # Normalizes 'text'
+data = chunk(data, config)     # Adds 'chunks'
+data = upload(data, config)    # Adds 'uploaded_items'
+return data['uploaded_items']
+```
 
 ## Documentation
 
