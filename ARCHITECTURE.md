@@ -385,3 +385,32 @@ chunks = process_pdf(
 ```
 
 All operations receive the same config dict for consistency.
+
+## Refactoring History
+
+### Complete Architecture Refactoring
+
+**Completed:** Full refactoring to modular app-based architecture with static methods and optimized uploads.
+
+**Key Changes:**
+1. **Metadata Standardization** - Implemented `ChunkMetadata` dataclass with validation at instantiation
+2. **App Integration** - Merged extractors into self-contained app processors (removed `extractors/` directory)
+3. **Static Methods** - Converted all processing methods to static for composable operations
+4. **Bulk Upload** - Implemented pandas DataFrame bulk upload for efficient chunk uploads
+5. **OCR Consolidation** - Unified OCR with conditional logic (Dataloop model + EasyOCR fallback)
+6. **Directory Reorganization** - Created `transforms/` and `utils/` with clear separation of concerns
+7. **Feature Completeness** - Added NLTK downloads, spell correction support, and batch OCR processing
+
+**Architecture Pattern:**
+- **Transforms** (`transforms/`) - Pipeline operations with uniform `(data: dict, config: dict) -> dict` signature
+- **Utils** (`utils/`) - Reusable implementations with specific type signatures
+- **Apps** (`apps/`) - Self-contained processors composing transforms and utils
+
+This follows the **Adapter Pattern** - transforms adapt utils to a uniform pipeline interface.
+
+**Benefits:**
+- Static methods enable concurrent processing
+- Self-contained apps with clear boundaries
+- Standardized metadata across all processors
+- Dataclass validation ensures data integrity
+- Comprehensive test suite for all components

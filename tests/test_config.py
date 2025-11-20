@@ -55,7 +55,7 @@ PDF_CONFIG = {
     'max_chunk_size': 500,
     'chunk_overlap': 20,
     # Text Cleaning
-    'to_correct_spelling': True,
+    'correct_spelling': True,
 }
 
 # ============================================================
@@ -74,5 +74,5 @@ DOC_CONFIG = {
     'max_chunk_size': 500,
     'chunk_overlap': 20,
     # Text Cleaning
-    'to_correct_spelling': True,
+    'correct_spelling': True,
 }
