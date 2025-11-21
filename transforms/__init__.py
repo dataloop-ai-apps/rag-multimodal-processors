@@ -14,7 +14,7 @@ from .chunking import (
 )
 from .ocr import ocr_enhance, describe_images_with_dataloop
 from .llm import llm_chunk_semantic, llm_summarize
-from .upload import upload_to_dataloop
+from utils.upload import upload_to_dataloop
 
 __all__ = [
     # Preprocessing

@@ -7,16 +7,17 @@ from typing import Dict, Any, List
 from pathlib import Path
 import dtlpy as dl
 import pandas as pd
-from utils.dataloop_helpers import upload_chunks
-from utils.chunk_metadata import ChunkMetadata
+from .dataloop_helpers import upload_chunks
+from .chunk_metadata import ChunkMetadata
 
 
 def upload_to_dataloop(data: Dict[str, Any], _config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Upload chunks to Dataloop dataset.
+    Upload chunks to Dataloop dataset with optional image associations.
 
     Args:
         data: Must contain 'chunks', 'item', 'target_dataset'
+              Optional: 'chunk_metadata', 'image_id_map' for image associations
         config: Not used
 
     Returns:
@@ -37,6 +38,16 @@ def upload_to_dataloop(data: Dict[str, Any], _config: Dict[str, Any]) -> Dict[st
 
     # Check if we have per-chunk metadata for bulk upload with DataFrame
     chunk_metadata_list = data.get('chunk_metadata', [])
+    image_id_map = data.get('image_id_map', {})
+
+    # Map image indices to actual image IDs if we have the mapping
+    if chunk_metadata_list and image_id_map:
+        for chunk_meta in chunk_metadata_list:
+            image_indices = chunk_meta.get('image_indices', [])
+            actual_image_ids = [
+                image_id_map[idx] for idx in image_indices if idx in image_id_map
+            ]
+            chunk_meta['image_ids'] = actual_image_ids
 
     if chunk_metadata_list and len(chunk_metadata_list) == len(chunks):
         # Use optimized bulk upload with per-chunk metadata
@@ -49,7 +60,6 @@ def upload_to_dataloop(data: Dict[str, Any], _config: Dict[str, Any]) -> Dict[st
         )
     else:
         # Fall back to standard upload
-        # should be a loop bc each item will have slightly different metadata
         uploaded_items = upload_chunks(
             chunks=chunks,
             source_item=item,

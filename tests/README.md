@@ -24,8 +24,9 @@ Integration tests require Dataloop items. Edit `tests/test_config.py`:
 TEST_ITEMS = {
     'pdf': {'item_id': 'your-pdf-item-id'},
     'doc': {'item_id': 'your-docx-item-id'},
-    'dataset': {'dataset_id': 'your-target-dataset-id'},
 }
+
+TARGET_DATASET_ID = 'your-target-dataset-id'
 
 PDF_CONFIG = {
     'max_chunk_size': 300,

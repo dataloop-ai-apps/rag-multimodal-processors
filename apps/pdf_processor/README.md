@@ -58,7 +58,7 @@ All parameters are configured via the pipeline node in Dataloop.
 | `chunking_strategy` | string | `"recursive"` | `"recursive"`, `"fixed-size"`, `"nltk-sentence"`, `"nltk-paragraphs"`, or `"1-chunk"` | Determines how the extracted text is split into chunks. `recursive`: Intelligently splits text respecting semantic boundaries (recommended for most use cases). `fixed-size`: Creates uniform chunks of equal size with overlap. `nltk-sentence`: Splits by sentences using NLTK. `nltk-paragraphs`: Splits by paragraphs using NLTK. `1-chunk`: No splitting, entire document as one chunk (useful for short documents). |
 | `max_chunk_size` | integer | `300` | `1` to `2000` characters | Maximum size of each text chunk in characters. Smaller chunks provide more granular retrieval but may lose context. Larger chunks maintain more context but may be less precise. Recommended range: 300-500 for most RAG applications. This parameter works with `chunk_overlap` to control chunk boundaries. |
 | `chunk_overlap` | integer | `20` | `0` to `400` characters | Number of characters that overlap between consecutive chunks. Overlap helps maintain context across chunk boundaries and prevents information loss at split points. Should be 10-20% of `max_chunk_size`. Set to 0 for no overlap. Higher values improve context preservation but increase storage requirements. |
-| `to_correct_spelling` | boolean | `false` | `true` or `false` | When enabled, applies text cleaning and normalization using the `unstructured.io` library. This includes: unicode quote replacement, non-ASCII character handling, punctuation normalization, and whitespace normalization. Enable for documents with OCR errors or inconsistent formatting. May slow down processing. |
+| `correct_spelling` | boolean | `false` | `true` or `false` | When enabled, applies text cleaning and normalization using the `unstructured.io` library. This includes: unicode quote replacement, non-ASCII character handling, punctuation normalization, and whitespace normalization. Enable for documents with OCR errors or inconsistent formatting. May slow down processing. |
 
 ### OCR Configuration
 
@@ -107,7 +107,7 @@ OCR processing uses **EasyOCR** for local, efficient text extraction from images
   "chunking_strategy": "recursive",
   "max_chunk_size": 500,
   "chunk_overlap": 50,
-  "to_correct_spelling": false
+  "correct_spelling": false
 }
 ```
 

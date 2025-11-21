@@ -9,12 +9,12 @@ Edit the values below to configure your test runs.
 # ============================================================
 # Test items (source dataset is obtained from item.dataset)
 TEST_ITEMS = {
-    'pdf': {'item_id': "6913452e732d419b5da2dc9c"},
-    'doc': {'item_id': "6913452dd4c1299c678a452a"},
+    'pdf': {'item_id': "6911a710d4c1299c6780c14f"},
+    'doc': {'item_id': "6910ba43732d419b5d98b41c"},
 }
 
-# Destination dataset where chunks will be uploaded (REQUIRED)
-DESTINATION_DATASET_ID = "691344d0a235b51330ed5951"  # Dataloop Demo 2025 - rag preprocess testing
+# Target dataset where chunks will be uploaded (REQUIRED)
+TARGET_DATASET_ID = "6910ba261a0566b56d15a55a"  # Dataloop Demo 2025 - rag preprocess testing
 
 # ============================================================
 # PDF TEST CONFIGURATION

@@ -48,17 +48,15 @@ APP_REGISTRY = {
 }
 
 
-def get_app_for_item(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any]):
+def get_app_class_for_item(item: dl.Item):
     """
-    Get the appropriate app for a given item based on MIME type.
+    Get the appropriate app class for a given item based on MIME type.
 
     Args:
         item: Dataloop item to process
-        target_dataset: Target dataset for chunks
-        config: Processing configuration
 
     Returns:
-        Initialized app instance (PDFProcessor or DOCProcessor)
+        App class (PDFProcessor or DOCProcessor)
 
     Raises:
         ValueError: If file type not supported
@@ -71,7 +69,7 @@ def get_app_for_item(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str
         raise ValueError(f"Unsupported file type: {mime_type}\n" f"Supported types: {supported}")
 
     logger.debug(f"Using {app_class.__name__} for {mime_type}")
-    return app_class(item, target_dataset, config)
+    return app_class
 
 
 # ============================================================================
@@ -108,8 +106,8 @@ def process_item(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, An
     logger.info(f"Processing {item.name} ({item.mimetype})")
 
     try:
-        app = get_app_for_item(item, target_dataset, config)
-        result = app.run()
+        app_class = get_app_class_for_item(item)
+        result = app_class.run(item, target_dataset, config)
         logger.info(f"Successfully processed {item.name}: {len(result)} chunks")
         return result
 

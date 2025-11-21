@@ -52,10 +52,8 @@ from apps import PDFProcessor, DOCProcessor
 **Example App Pattern:**
 ```python
 class PDFProcessor(dl.BaseServiceRunner):
-    def __init__(self, item=None, target_dataset=None, config=None):
-        self.item = item
-        self.target_dataset = target_dataset
-        self.config = config or {}
+    def __init__(self):
+        pass  # No instance state needed
 
     @staticmethod
     def extract(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,13 +76,20 @@ class PDFProcessor(dl.BaseServiceRunner):
         """Upload chunks to Dataloop."""
         return transforms.upload_to_dataloop(data, config)
 
-    def run(self) -> List[dl.Item]:
-        """Execute the pipeline."""
-        data = {'item': self.item, 'target_dataset': self.target_dataset}
-        data = PDFProcessor.extract(data, self.config)
-        data = PDFProcessor.clean(data, self.config)
-        data = PDFProcessor.chunk(data, self.config)
-        data = PDFProcessor.upload(data, self.config)
+    @staticmethod
+    def process_document(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
+        """Dataloop pipeline entry point."""
+        config = context.node.metadata.get('customNodeConfig', {})
+        return PDFProcessor.run(item, target_dataset, config)
+
+    @staticmethod
+    def run(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any]) -> List[dl.Item]:
+        """Main processing method."""
+        data = {'item': item, 'target_dataset': target_dataset}
+        data = PDFProcessor.extract(data, config)
+        data = PDFProcessor.clean(data, config)
+        data = PDFProcessor.chunk(data, config)
+        data = PDFProcessor.upload(data, config)
         return data.get('uploaded_items', [])
 ```
 
@@ -119,7 +124,7 @@ def clean_text(data: Dict, config: Dict) -> Dict:
     """Clean and normalize text content."""
     text = data.get('text', '')
 
-    if config.get('to_correct_spelling', False):
+    if config.get('correct_spelling', False):
         from utils.text_cleaning import clean_text as deep_clean
         text = deep_clean(text)
 
@@ -213,10 +218,8 @@ from utils.data_types import ExtractedContent
 import transforms
 
 class XLSProcessor(dl.BaseServiceRunner):
-    def __init__(self, item=None, target_dataset=None, config=None):
-        self.item = item
-        self.target_dataset = target_dataset
-        self.config = config or {}
+    def __init__(self):
+        pass  # No instance state needed
 
     @staticmethod
     def extract(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -226,7 +229,6 @@ class XLSProcessor(dl.BaseServiceRunner):
             file_path = item.download(local_path=temp_dir)
             workbook = openpyxl.load_workbook(file_path)
 
-            # Extract all text from all sheets
             all_text = []
             for sheet in workbook.worksheets:
                 for row in sheet.iter_rows(values_only=True):
@@ -242,26 +244,30 @@ class XLSProcessor(dl.BaseServiceRunner):
 
     @staticmethod
     def clean(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Clean text - reuse shared transform."""
         return transforms.clean_text(data, config)
 
     @staticmethod
     def chunk(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Chunk text - reuse shared transform."""
         return transforms.chunk_text(data, config)
 
     @staticmethod
     def upload(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Upload chunks - reuse shared transform."""
         return transforms.upload_to_dataloop(data, config)
 
-    def run(self) -> List[dl.Item]:
-        """Execute pipeline - same pattern as other processors."""
-        data = {'item': self.item, 'target_dataset': self.target_dataset}
-        data = XLSProcessor.extract(data, self.config)
-        data = XLSProcessor.clean(data, self.config)
-        data = XLSProcessor.chunk(data, self.config)
-        data = XLSProcessor.upload(data, self.config)
+    @staticmethod
+    def process_document(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
+        """Dataloop pipeline entry point."""
+        config = context.node.metadata.get('customNodeConfig', {})
+        return XLSProcessor.run(item, target_dataset, config)
+
+    @staticmethod
+    def run(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any]) -> List[dl.Item]:
+        """Main processing method."""
+        data = {'item': item, 'target_dataset': target_dataset}
+        data = XLSProcessor.extract(data, config)
+        data = XLSProcessor.clean(data, config)
+        data = XLSProcessor.chunk(data, config)
+        data = XLSProcessor.upload(data, config)
         return data.get('uploaded_items', [])
 ```
 
