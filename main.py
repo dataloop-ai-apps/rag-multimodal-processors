@@ -20,11 +20,12 @@ Example:
 """
 
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Type
 import dtlpy as dl
 
 # Import app processors
 from apps import PDFProcessor, DOCProcessor
+from utils.config import Config
 
 # Setup module logger
 logger = logging.getLogger(__name__)
@@ -40,15 +41,15 @@ if not logger.handlers:
 # APP REGISTRY
 # ============================================================================
 
-# Map MIME types to app classes
-APP_REGISTRY = {
+# Map MIME types to processor classes
+APP_REGISTRY: Dict[str, Type[dl.BaseServiceRunner]] = {
     'application/pdf': PDFProcessor,
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DOCProcessor,
     'application/vnd.google-apps.document': DOCProcessor,  # Google Docs exported as DOCX
 }
 
 
-def get_app_class_for_item(item: dl.Item):
+def get_app_class_for_item(item: dl.Item) -> Type[dl.BaseServiceRunner]:
     """
     Get the appropriate app class for a given item based on MIME type.
 
@@ -66,7 +67,7 @@ def get_app_class_for_item(item: dl.Item):
 
     if app_class is None:
         supported = ', '.join(APP_REGISTRY.keys())
-        raise ValueError(f"Unsupported file type: {mime_type}\n" f"Supported types: {supported}")
+        raise ValueError(f"Unsupported file type: {mime_type}\nSupported types: {supported}")
 
     logger.debug(f"Using {app_class.__name__} for {mime_type}")
     return app_class
@@ -77,7 +78,7 @@ def get_app_class_for_item(item: dl.Item):
 # ============================================================================
 
 
-def process_item(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any] = None) -> List[dl.Item]:
+def process_item(item: dl.Item, target_dataset: dl.Dataset, config: Optional[Dict[str, Any]] = None) -> List[dl.Item]:
     """
     Process any supported file type (PDF or DOC).
 
@@ -219,7 +220,7 @@ def process_doc(item: dl.Item, target_dataset: dl.Dataset, **config) -> List[dl.
 
 
 def process_batch(
-    items: List[dl.Item], target_dataset: dl.Dataset, config: Dict[str, Any] = None
+    items: List[dl.Item], target_dataset: dl.Dataset, config: Optional[Dict[str, Any]] = None
 ) -> Dict[str, List[dl.Item]]:
     """
     Process multiple items in batch.

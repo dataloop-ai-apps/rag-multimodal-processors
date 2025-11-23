@@ -46,94 +46,30 @@ class PDFProcessor(dl.BaseServiceRunner):
         """Apply OCR if enabled."""
         if not data.config.use_ocr:
             return data
-
-        data.current_stage = "ocr"
-        try:
-            # Convert to dict for legacy transform, then back
-            data_dict = {
-                'content': data.content_text,
-                'images': [img.to_dict() for img in data.images],
-                'metadata': data.metadata,
-            }
-            config_dict = data.config.to_dict()
-            config_dict['use_ocr'] = True
-
-            result = transforms.ocr_enhance(data_dict, config_dict)
-            data.content_text = result.get('content', data.content_text)
-        except Exception as e:
-            data.log_warning(f"OCR failed: {e}")
-
-        return data
+        return transforms.ocr_enhance(data)
 
     @staticmethod
     def clean(data: ExtractedData) -> ExtractedData:
         """Clean and normalize text."""
-        data.current_stage = "cleaning"
-        try:
-            data_dict = {'content': data.content_text}
-            config_dict = data.config.to_dict()
-
-            data_dict = transforms.clean_text(data_dict, config_dict)
-            data_dict = transforms.normalize_whitespace(data_dict, config_dict)
-
-            data.cleaned_text = data_dict.get('content', data.content_text)
-        except Exception as e:
-            data.log_warning(f"Cleaning failed: {e}")
-            data.cleaned_text = data.content_text
-
-        return data
+        return transforms.clean(data)
 
     @staticmethod
     def chunk(data: ExtractedData) -> ExtractedData:
         """Chunk content based on strategy."""
-        data.current_stage = "chunking"
-        try:
-            data_dict = {
-                'content': data.get_text(),
-                'images': [img.to_dict() for img in data.images],
-                'metadata': data.metadata,
-            }
-            config_dict = data.config.to_dict()
+        strategy = data.config.chunking_strategy
+        has_images = data.has_images()
 
-            strategy = data.config.chunking_strategy
-            has_images = data.has_images()
-
-            if strategy == 'recursive' and has_images:
-                data_dict = transforms.chunk_recursive_with_images(data_dict, config_dict)
-            elif strategy == 'semantic':
-                data_dict = transforms.llm_chunk_semantic(data_dict, config_dict)
-            else:
-                data_dict = transforms.chunk_text(data_dict, config_dict)
-
-            data.chunks = data_dict.get('chunks', [])
-            data.chunk_metadata = data_dict.get('chunk_metadata', [])
-        except Exception as e:
-            if not data.log_error(f"Chunking failed: {e}"):
-                return data
-
-        return data
+        if strategy == 'recursive' and has_images:
+            return transforms.chunk_with_images(data)
+        elif strategy == 'semantic':
+            return transforms.llm_chunk_semantic(data)
+        else:
+            return transforms.chunk(data)
 
     @staticmethod
     def upload(data: ExtractedData) -> ExtractedData:
         """Upload chunks to Dataloop."""
-        data.current_stage = "upload"
-        try:
-            data_dict = {
-                'item': data.item,
-                'target_dataset': data.target_dataset,
-                'chunks': data.chunks,
-                'chunk_metadata': data.chunk_metadata,
-                'images': [img.to_dict() for img in data.images],
-                'metadata': data.metadata,
-            }
-            config_dict = data.config.to_dict()
-
-            result = transforms.upload_to_dataloop(data_dict, config_dict)
-            data.uploaded_items = result.get('uploaded_items', [])
-        except Exception as e:
-            data.log_error(f"Upload failed: {e}")
-
-        return data
+        return transforms.upload_to_dataloop(data)
 
     @staticmethod
     def process_document(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
@@ -154,7 +90,6 @@ class PDFProcessor(dl.BaseServiceRunner):
         Returns:
             List of uploaded chunk items
         """
-        # Create ExtractedData with config
         cfg = Config.from_dict(config or {})
         data = ExtractedData(item=item, target_dataset=target_dataset, config=cfg)
 

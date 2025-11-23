@@ -2,423 +2,347 @@
 
 ## Overview
 
-**Modular app-based architecture** designed for easy extension with new file types:
+**Type-safe, stateless architecture** using `ExtractedData` dataclass as the central data structure:
 
 ```
-Item → App (Extract → Clean → Chunk → Upload) → Chunks
+Item -> App (Extract -> Clean -> Chunk -> Upload) -> Chunks
 ```
 
-Each file type is a self-contained processor that follows a simple, consistent pipeline pattern using shared transforms and utilities.
+Each file type is a self-contained processor that follows a consistent pipeline pattern with typed data flow.
 
 ## Supported File Types
 
-- **PDF** (.pdf) - `PDFProcessor`
-- **DOC** (.docx) - `DOCProcessor`
+- **PDF** (.pdf) - `PDFProcessor` with `PDFExtractor`
+- **DOC** (.docx) - `DOCProcessor` with `DOCExtractor`
+
+## Core Data Structure: ExtractedData
+
+All pipeline operations use `ExtractedData` dataclass for type-safe data flow:
+
+```python
+@dataclass
+class ExtractedData:
+    # Input
+    item: Optional[dl.Item] = None
+    target_dataset: Optional[dl.Dataset] = None
+    config: Config = field(default_factory=Config)
+
+    # Extraction outputs
+    content_text: str = ""
+    images: List[ImageContent] = field(default_factory=list)
+    tables: List[TableContent] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    # Processing outputs
+    cleaned_text: str = ""
+    chunks: List[str] = field(default_factory=list)
+    chunk_metadata: List[Dict[str, Any]] = field(default_factory=list)
+    uploaded_items: List[Any] = field(default_factory=list)
+
+    # Error tracking
+    errors: ErrorTracker = field(default_factory=ErrorTracker)
+    current_stage: str = "init"
+```
 
 ## Components
 
 ### 1. Apps (`apps/`)
 
-File-type specific processor classes organized as a **Python package**. Each app:
-- Implements the same pipeline pattern: extract → clean → chunk → upload
-- Uses static methods for composable processing steps
+File-type specific processor classes. Each app:
+- Uses `ExtractedData` throughout the pipeline
+- Implements static methods for composable processing
 - Calls shared transforms for reusable operations
-- Includes its own Dockerfile and Dataloop manifest for independent deployment
+- Has dedicated extractor module for file-specific logic
 
 **Structure:**
 ```
 apps/
-├── __init__.py                  # Package exports PDFProcessor, DOCProcessor
+├── __init__.py
 ├── pdf_processor/
-│   ├── __init__.py             # Sub-package exports
-│   ├── pdf_processor.py
+│   ├── __init__.py
+│   ├── app.py              # PDFProcessor class
+│   ├── pdf_extractor.py    # PDFExtractor - extraction logic
 │   ├── dataloop.json
-│   ├── Dockerfile
-│   └── README.md
+│   └── Dockerfile
 └── doc_processor/
-    ├── __init__.py             # Sub-package exports
-    ├── doc_processor.py
+    ├── __init__.py
+    ├── app.py              # DOCProcessor class
+    ├── doc_extractor.py    # DOCExtractor - extraction logic
     ├── dataloop.json
-    ├── Dockerfile
-    └── README.md
+    └── Dockerfile
 ```
 
-**Importing:**
-```python
-# Clean imports - no sys.path manipulation needed
-from apps import PDFProcessor, DOCProcessor
-```
-
-**Example App Pattern:**
+**Example Processor:**
 ```python
 class PDFProcessor(dl.BaseServiceRunner):
-    def __init__(self):
-        pass  # No instance state needed
+    @staticmethod
+    def extract(data: ExtractedData) -> ExtractedData:
+        return PDFExtractor.extract(data)
 
     @staticmethod
-    def extract(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract content from PDF file."""
-        # File-specific extraction logic here
-        return data
+    def clean(data: ExtractedData) -> ExtractedData:
+        return transforms.clean(data)
 
     @staticmethod
-    def clean(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Clean and normalize text."""
-        return transforms.clean_text(data, config)
+    def chunk(data: ExtractedData) -> ExtractedData:
+        return transforms.chunk(data)
 
     @staticmethod
-    def chunk(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Chunk content based on strategy."""
-        return transforms.chunk_text(data, config)
+    def upload(data: ExtractedData) -> ExtractedData:
+        return transforms.upload_to_dataloop(data)
 
     @staticmethod
-    def upload(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Upload chunks to Dataloop."""
-        return transforms.upload_to_dataloop(data, config)
+    def run(item: dl.Item, target_dataset: dl.Dataset, config: Optional[Dict] = None) -> List[dl.Item]:
+        cfg = Config.from_dict(config or {})
+        data = ExtractedData(item=item, target_dataset=target_dataset, config=cfg)
 
-    @staticmethod
-    def process_document(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
-        """Dataloop pipeline entry point."""
-        config = context.node.metadata.get('customNodeConfig', {})
-        return PDFProcessor.run(item, target_dataset, config)
+        data = PDFProcessor.extract(data)
+        data = PDFProcessor.clean(data)
+        data = PDFProcessor.chunk(data)
+        data = PDFProcessor.upload(data)
 
-    @staticmethod
-    def run(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any]) -> List[dl.Item]:
-        """Main processing method."""
-        data = {'item': item, 'target_dataset': target_dataset}
-        data = PDFProcessor.extract(data, config)
-        data = PDFProcessor.clean(data, config)
-        data = PDFProcessor.chunk(data, config)
-        data = PDFProcessor.upload(data, config)
-        return data.get('uploaded_items', [])
+        return data.uploaded_items
 ```
 
-**Key Points:**
-- Static methods enable simple composition without instance dependencies
-- Each step receives and returns a shared `data` dictionary
-- Transforms handle common operations (cleaning, chunking, upload)
-- File-specific logic lives only in the `extract` method
+### 2. Extractors (`apps/*/extractor.py`)
 
-### 2. Transforms (`transforms/`)
+Dedicated extraction modules with file-specific logic:
 
-**Reusable pipeline operations** with uniform signature: `(data: dict, config: dict) -> dict`
+```python
+class PDFExtractor:
+    @staticmethod
+    def extract(data: ExtractedData) -> ExtractedData:
+        data.current_stage = "extraction"
+        # File-specific extraction logic
+        data.content_text = extracted_text
+        data.images = extracted_images
+        data.metadata['page_count'] = page_count
+        return data
+```
 
-Transforms provide composable operations that work across all file types:
-- Extract parameters from the shared `data` dictionary
-- Transform the data
-- Put results back into the `data` dictionary
-- Enable mixing and matching operations in any app
+### 3. Transforms (`transforms/`)
+
+**Pipeline operations with uniform signature:** `(data: ExtractedData) -> ExtractedData`
 
 **Available Transforms:**
-- **chunking.py**: Text chunking strategies (recursive, semantic, etc.)
-- **text_normalization.py**: Text cleaning and normalization
-- **ocr.py**: OCR enhancement for images
-- **llm.py**: LLM-based operations (semantic chunking, summarization)
-- **upload.py**: Chunk upload with metadata
 
-**Utilities:**
-- **utils/text_cleaning.py**: Deep text cleaning using unstructured.io
+| Module | Functions |
+|--------|-----------|
+| `text_normalization.py` | `clean()`, `normalize_whitespace()`, `remove_empty_lines()` |
+| `chunking.py` | `chunk()`, `chunk_with_images()`, `TextChunker` |
+| `ocr.py` | `ocr_enhance()`, `describe_images()`, `ocr_batch_enhance()` |
+| `llm.py` | `llm_chunk_semantic()`, `llm_summarize()`, `llm_extract_entities()` |
 
 **Example Transform:**
 ```python
-# transforms/text_normalization.py
-def clean_text(data: Dict, config: Dict) -> Dict:
+def clean(data: ExtractedData) -> ExtractedData:
     """Clean and normalize text content."""
-    text = data.get('text', '')
+    data.current_stage = "cleaning"
+    content = data.content_text
 
-    if config.get('correct_spelling', False):
-        from utils.text_cleaning import clean_text as deep_clean
-        text = deep_clean(text)
+    if not content:
+        data.cleaned_text = ""
+        return data
 
-    data['text'] = text
+    # Apply cleaning
+    content = content.strip()
+    content = re.sub(r' +', ' ', content)
+    content = re.sub(r'\n{3,}', '\n\n', content)
+
+    data.cleaned_text = content
+    data.metadata['cleaning_applied'] = True
     return data
 ```
 
-**Why Uniform Signature?**
-- **Composable**: Chain any transforms together
-- **Reusable**: Same transform works in any app
-- **Testable**: Easy to test in isolation
-- **Flexible**: Add new transforms without changing apps
+### 4. Utils (`utils/`)
 
-### 3. Utils (`utils/`)
+**Core utilities and data models:**
 
-**Shared utilities and data models** used by transforms and apps.
+| Module | Purpose |
+|--------|---------|
+| `extracted_data.py` | `ExtractedData` dataclass - central pipeline structure |
+| `config.py` | `Config` dataclass with validation |
+| `errors.py` | `ErrorTracker` for error/warning tracking |
+| `data_types.py` | `ImageContent`, `TableContent` data models |
+| `upload.py` | `upload_to_dataloop()` upload transform |
+| `dataloop_helpers.py` | Dataloop integration helpers |
+| `chunk_metadata.py` | `ChunkMetadata` dataclass |
 
-Utils provides infrastructure that multiple components depend on:
-- Have specific type signatures (not generic `(data, config) -> data`)
-- Can be used standalone outside of pipelines
-- Contain implementation details and integrations
+### 5. Main API (`main.py`)
 
-**Available Modules:**
-- **dataloop_helpers.py**: Upload helpers and Dataloop integrations
-- **chunk_metadata.py**: `ChunkMetadata` dataclass for standardized metadata
-- **data_types.py**: `ExtractedContent`, `ImageContent`, `TableContent` data models
-- **ocr_utils.py**: OCR utilities with multiple backends
-- **dataloop_model_executor.py**: Model execution wrapper
-
-**Example Utils:**
-```python
-# utils/chunk_metadata.py
-@dataclass
-class ChunkMetadata:
-    """Standardized metadata for chunks."""
-    source_item_id: str
-    source_file: str
-    chunk_index: int
-    total_chunks: int
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary for Dataloop upload."""
-        return asdict(self)
-```
-
-### 4. Main API (`main.py`)
-
-Routes requests to appropriate apps based on MIME type using a **registry pattern**:
+Routes requests to appropriate apps based on MIME type:
 
 ```python
 from apps import PDFProcessor, DOCProcessor
 
-# Simple registry - just map MIME types to processor classes
-APP_REGISTRY = {
+APP_REGISTRY: Dict[str, Type[dl.BaseServiceRunner]] = {
     'application/pdf': PDFProcessor,
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DOCProcessor,
 }
 
-def process_item(item, target_dataset, config):
-    """Auto-detect file type and route to appropriate processor."""
+def process_item(item, target_dataset, config=None):
     app_class = APP_REGISTRY[item.mimetype]
-    app = app_class(item, target_dataset, config)
-    return app.run()
+    return app_class.run(item, target_dataset, config or {})
 ```
 
-**Adding a New File Type:**
+## Configuration
+
+Configuration is handled through the `Config` dataclass with validation:
+
 ```python
-# 1. Import your new processor
-from apps import PDFProcessor, DOCProcessor, XLSProcessor
+@dataclass
+class Config:
+    # Error handling
+    error_mode: Literal['stop', 'continue'] = 'continue'
+    max_errors: int = 10
 
-# 2. Add to registry
-APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
+    # Extraction
+    extraction_method: Literal['markdown', 'basic'] = 'markdown'
+    extract_images: bool = True
+    extract_tables: bool = True
 
-# That's it! Now Excel files are supported.
+    # OCR
+    use_ocr: bool = False
+    ocr_model_id: Optional[str] = None
+
+    # Chunking
+    chunking_strategy: Literal['recursive', 'fixed', 'sentence', 'none'] = 'recursive'
+    max_chunk_size: int = 300
+    chunk_overlap: int = 20
+
+    def validate(self) -> None:
+        """Validate configuration consistency."""
+        errors = []
+        if self.max_chunk_size <= 0:
+            errors.append("max_chunk_size must be positive")
+        if self.chunk_overlap >= self.max_chunk_size:
+            errors.append("chunk_overlap must be less than max_chunk_size")
+        if errors:
+            raise ValueError("; ".join(errors))
 ```
+
+## Error Handling
+
+Error tracking through `ErrorTracker`:
+
+```python
+@dataclass
+class ErrorTracker:
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    max_errors: int = 10
+    error_mode: str = 'continue'
+
+    def add_error(self, message: str, stage: str = "") -> bool:
+        """Add error and return whether to continue processing."""
+        self.errors.append(f"[{stage}] {message}" if stage else message)
+
+        if self.error_mode == 'stop':
+            return False
+        return len(self.errors) < self.max_errors
+```
+
+**Error Modes:**
+- `'stop'`: Halt on first error
+- `'continue'`: Allow up to `max_errors` before stopping
 
 ## Extension Guide
 
 ### Adding a New File Type
 
-The modular architecture makes adding new file types straightforward. Here's how to add Excel support:
-
-**1. Create App** (`apps/xls_processor/xls_processor.py`):
+1. **Create Extractor** (`apps/xls_processor/xls_extractor.py`):
 ```python
-import logging
-import tempfile
-from typing import Dict, Any, List
-import dtlpy as dl
-import openpyxl
-from utils.data_types import ExtractedContent
+from utils.extracted_data import ExtractedData
+
+class XLSExtractor:
+    @staticmethod
+    def extract(data: ExtractedData) -> ExtractedData:
+        data.current_stage = "extraction"
+        # File-specific extraction
+        data.content_text = extracted_text
+        return data
+```
+
+2. **Create Processor** (`apps/xls_processor/app.py`):
+```python
 import transforms
+from utils.extracted_data import ExtractedData
+from utils.config import Config
 
 class XLSProcessor(dl.BaseServiceRunner):
-    def __init__(self):
-        pass  # No instance state needed
-
     @staticmethod
-    def extract(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract text from Excel file - file-specific logic here."""
-        item = data.get('item')
-        with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = item.download(local_path=temp_dir)
-            workbook = openpyxl.load_workbook(file_path)
+    def run(item, target_dataset, config=None):
+        cfg = Config.from_dict(config or {})
+        data = ExtractedData(item=item, target_dataset=target_dataset, config=cfg)
 
-            all_text = []
-            for sheet in workbook.worksheets:
-                for row in sheet.iter_rows(values_only=True):
-                    row_text = ' '.join([str(cell) for cell in row if cell])
-                    all_text.append(row_text)
+        data = XLSExtractor.extract(data)
+        data = transforms.clean(data)
+        data = transforms.chunk(data)
+        data = transforms.upload_to_dataloop(data)
 
-            result = ExtractedContent(
-                text='\n'.join(all_text),
-                metadata={'processor': 'xls', 'sheet_count': len(workbook.worksheets)}
-            )
-            data.update(result.to_dict())
-        return data
-
-    @staticmethod
-    def clean(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        return transforms.clean_text(data, config)
-
-    @staticmethod
-    def chunk(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        return transforms.chunk_text(data, config)
-
-    @staticmethod
-    def upload(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        return transforms.upload_to_dataloop(data, config)
-
-    @staticmethod
-    def process_document(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
-        """Dataloop pipeline entry point."""
-        config = context.node.metadata.get('customNodeConfig', {})
-        return XLSProcessor.run(item, target_dataset, config)
-
-    @staticmethod
-    def run(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any]) -> List[dl.Item]:
-        """Main processing method."""
-        data = {'item': item, 'target_dataset': target_dataset}
-        data = XLSProcessor.extract(data, config)
-        data = XLSProcessor.clean(data, config)
-        data = XLSProcessor.chunk(data, config)
-        data = XLSProcessor.upload(data, config)
-        return data.get('uploaded_items', [])
+        return data.uploaded_items
 ```
 
-Notice:
-- Only `extract()` has file-specific logic
-- `clean()`, `chunk()`, `upload()` just call shared transforms
-- Same pipeline pattern as PDF and DOC processors
-
-**2. Create Package** (`apps/xls_processor/__init__.py`):
+3. **Register** in `main.py`:
 ```python
-from .xls_processor import XLSProcessor
-__all__ = ['XLSProcessor']
-```
-
-**3. Export** (`apps/__init__.py`):
-```python
-from .xls_processor.xls_processor import XLSProcessor
-__all__ = [..., 'XLSProcessor']
-```
-
-**4. Register** (`main.py`):
-```python
-from apps import PDFProcessor, DOCProcessor, XLSProcessor
 APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
 ```
 
-**That's it!** Your new processor follows the same pattern and reuses all existing transforms.
-
 ### Adding a New Transform
 
-**Option A: Simple Transform**
-
-**1. Create Transform** (`transforms/my_module.py`):
 ```python
-def uppercase_text(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Simple transform - do transformation directly."""
-    text = data.get('text', '')
-    data['text'] = text.upper()
+# transforms/custom.py
+from utils.extracted_data import ExtractedData
+
+def my_transform(data: ExtractedData) -> ExtractedData:
+    """Custom transform with standard signature."""
+    data.current_stage = "custom"
+    content = data.get_text()
+    # Transform logic
+    data.cleaned_text = transformed_content
     return data
 ```
 
-**2. Export** (`transforms/__init__.py`):
+Export from `transforms/__init__.py`:
 ```python
-from .my_module import uppercase_text
-__all__ = [..., 'uppercase_text']
+from .custom import my_transform
 ```
 
-**3. Use in Any App**:
-```python
-@staticmethod
-def clean(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    data = transforms.uppercase_text(data, config)  # Works in any processor!
-    return data
+## Testing
+
+108 unit tests covering all components:
+
+```bash
+pytest tests/ -v
 ```
 
-**Option B: Transform with Utils (for complex logic)**
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `test_utils_config.py` | 16 | Config validation |
+| `test_utils_errors.py` | 20 | Error tracking |
+| `test_extracted_data.py` | 24 | ExtractedData dataclass |
+| `test_extractors.py` | 16 | PDF/DOC extractors |
+| `test_transforms.py` | 32 | All transforms |
 
-**1. Create Utils** (`utils/my_helper.py`):
-```python
-def complex_transformation(text: str, options: dict) -> str:
-    """Reusable implementation."""
-    # Complex logic here
-    return transformed_text
-```
+## Design Principles
 
-**2. Create Transform** (`transforms/my_module.py`):
-```python
-def my_transform(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Transform calls utils implementation."""
-    from utils.my_helper import complex_transformation
+### Stateless Architecture
+- All callable functions are static methods
+- No instance variables - state passed through `ExtractedData`
+- Thread-safe by design for concurrent processing
 
-    text = data.get('text', '')
-    options = config.get('my_options', {})
-    transformed = complex_transformation(text, options)
-    data['text'] = transformed
-    return data
-```
+### Type Safety
+- `ExtractedData` dataclass with typed fields
+- `Config` dataclass with validation
+- Transform signatures: `(ExtractedData) -> ExtractedData`
 
-**Why This Pattern?**
-- **Uniform interface**: All transforms have `(data, config) -> data` signature
-- **Composable**: Chain transforms together easily
-- **Reusable**: Same transform works in every processor
-- **Simple**: Most transforms are just 5-10 lines of code
+### Separation of Concerns
+- **Extractors**: File-specific extraction logic
+- **Transforms**: Reusable pipeline operations
+- **Utils**: Core utilities and data models
+- **Apps**: Compose extractors and transforms
 
-## Configuration
-
-Apps accept a configuration dictionary with these options:
-
-```python
-config = {
-    # Chunking
-    'max_chunk_size': 300,              # Maximum chunk size (100-10000)
-    'chunk_overlap': 20,                # Overlap between chunks (0-500)
-    'chunking_strategy': 'recursive',   # 'recursive', 'semantic', 'sentence', 'paragraph'
-
-    # OCR (PDF only)
-    'use_ocr': True,                    # Apply OCR to images
-    'ocr_method': 'append_to_page',     # 'append_to_page', 'separate_chunks', 'combine_all'
-
-    # LLM
-    'llm_model_id': 'model-id',         # Required for semantic chunking
-
-    # Logging
-    'log_level': 'INFO',                # 'DEBUG', 'INFO', 'WARNING', 'ERROR'
-}
-```
-
-**Usage:**
-```python
-from main import process_pdf
-
-chunks = process_pdf(
-    item=pdf_item,
-    target_dataset=dataset,
-    use_ocr=True,
-    max_chunk_size=500,
-    chunking_strategy='semantic',
-    llm_model_id='your-model-id',
-    log_level='DEBUG'
-)
-```
-
-All operations receive the same config dict for consistency.
-
-## Refactoring History
-
-### Complete Architecture Refactoring
-
-**Completed:** Full refactoring to modular app-based architecture with static methods and optimized uploads.
-
-**Key Changes:**
-1. **Metadata Standardization** - Implemented `ChunkMetadata` dataclass with validation at instantiation
-2. **App Integration** - Merged extractors into self-contained app processors (removed `extractors/` directory)
-3. **Static Methods** - Converted all processing methods to static for composable operations
-4. **Bulk Upload** - Implemented pandas DataFrame bulk upload for efficient chunk uploads
-5. **OCR Consolidation** - Unified OCR with conditional logic (Dataloop model + EasyOCR fallback)
-6. **Directory Reorganization** - Created `transforms/` and `utils/` with clear separation of concerns
-7. **Feature Completeness** - Added NLTK downloads, spell correction support, and batch OCR processing
-
-**Architecture Pattern:**
-- **Transforms** (`transforms/`) - Pipeline operations with uniform `(data: dict, config: dict) -> dict` signature
-- **Utils** (`utils/`) - Reusable implementations with specific type signatures
-- **Apps** (`apps/`) - Self-contained processors composing transforms and utils
-
-This follows the **Adapter Pattern** - transforms adapt utils to a uniform pipeline interface.
-
-**Benefits:**
-- Static methods enable concurrent processing
-- Self-contained apps with clear boundaries
-- Standardized metadata across all processors
-- Dataclass validation ensures data integrity
-- Comprehensive test suite for all components
+### Concurrency Support
+- Stateless functions enable parallel document processing
+- No shared state or race conditions
+- Each `ExtractedData` instance is independent

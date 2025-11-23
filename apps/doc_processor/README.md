@@ -117,3 +117,29 @@ Each chunk includes comprehensive metadata for provenance tracking:
 }
 ```
 
+## 🏗️ Architecture
+
+The DOC processor uses a type-safe, stateless architecture:
+
+```
+DOCProcessor (app.py)
+    ├── DOCExtractor (doc_extractor.py) - DOCX-specific extraction
+    └── Transforms - Shared pipeline operations
+        ├── transforms.clean() - Text normalization
+        ├── transforms.chunk() - Text chunking
+        └── transforms.upload_to_dataloop() - Chunk upload
+```
+
+**Key Components:**
+- `ExtractedData` dataclass flows through the entire pipeline
+- `Config` dataclass handles validated configuration
+- All methods are static for concurrent processing support
+
+**Pipeline Flow:**
+```python
+data = DOCExtractor.extract(data)    # Extract text, images, tables
+data = transforms.clean(data)         # Normalize text
+data = transforms.chunk(data)         # Split into chunks
+data = transforms.upload_to_dataloop(data)  # Upload chunks
+```
+

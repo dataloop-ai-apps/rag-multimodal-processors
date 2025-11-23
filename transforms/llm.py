@@ -1,25 +1,29 @@
 """
-LLM-based processing stages using Dataloop models.
-All stage functions follow signature: (data: dict, config: dict) -> dict
+LLM-based processing transforms using Dataloop models.
+
+All functions follow signature: (data: ExtractedData) -> ExtractedData
 """
 
 import json
 import tempfile
 import os
+from typing import Optional
+
 import dtlpy as dl
-from typing import Dict, Any, Optional
+
+from utils.extracted_data import ExtractedData
 
 
 def _call_llm_model(model_id: str, prompt: str, dataset: Optional[dl.Dataset] = None) -> Optional[str]:
     """
-    Helper function to call Dataloop LLM model with a text prompt.
+    Call Dataloop LLM model with a text prompt.
 
     Creates a temporary text item, runs prediction, and retrieves result.
 
     Args:
         model_id: Dataloop model ID
         prompt: Text prompt to send to the model
-        dataset: Optional dataset to create temporary item in (uses model's dataset if not provided)
+        dataset: Optional dataset for temporary item
 
     Returns:
         Model response text, or None if execution fails
@@ -29,42 +33,30 @@ def _call_llm_model(model_id: str, prompt: str, dataset: Optional[dl.Dataset] = 
     temp_path = None
 
     try:
-        # Get model
         model = dl.models.get(model_id=model_id)
 
-        # Get dataset for temporary item
         if dataset is None:
-            # Try to get dataset from model's project
             project = model.project
             datasets = project.datasets.list()
             if datasets.items:
                 dataset = datasets.items[0]
             else:
-                print("Warning: No dataset available for temporary item creation")
                 return None
 
-        # Create temporary text file with prompt
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             f.write(prompt)
             temp_path = f.name
 
-        # Upload as temporary item
         temp_item = dataset.items.upload(local_path=temp_path, remote_path='/temp', overwrite=True)
 
-        # Execute model prediction
         execution = model.predict(item_ids=[temp_item.id])
         execution.wait()
 
-        # Check execution status
         if execution.latest_status['status'] == dl.ExecutionStatus.SUCCESS:
-            # Get result from execution or item annotations
-            # For LLM models, result is typically in item annotations or execution output
             updated_item = dl.items.get(item_id=temp_item.id)
 
-            # Try to get result from annotations (common for LLM models)
             annotations = updated_item.annotations.list()
             if annotations.items:
-                # Get text from first annotation or annotation field
                 for ann in annotations.items:
                     if hasattr(ann, 'label') and ann.label == 'response':
                         result = ann.metadata.get('text', '')
@@ -73,31 +65,25 @@ def _call_llm_model(model_id: str, prompt: str, dataset: Optional[dl.Dataset] = 
                         result = ann.metadata['text']
                         break
 
-            # If no annotation, try to get from item metadata or execution output
             if not result:
                 result = updated_item.metadata.get('llm_response', '')
 
-            # If still no result, check execution output
             if not result and hasattr(execution, 'output') and execution.output:
                 result = str(execution.output)
 
-        # Clean up temporary item
         if temp_item:
             try:
                 temp_item.delete()
             except Exception:
                 pass
 
-        # Clean up temporary file
         if temp_path and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
             except Exception:
                 pass
 
-    except Exception as e:
-        print(f"Warning: LLM model call failed: {e}")
-        # Clean up on error
+    except Exception:
         if temp_item:
             try:
                 temp_item.delete()
@@ -112,173 +98,136 @@ def _call_llm_model(model_id: str, prompt: str, dataset: Optional[dl.Dataset] = 
     return result
 
 
-def llm_chunk_semantic(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def llm_chunk_semantic(data: ExtractedData) -> ExtractedData:
     """
     Semantic chunking using a LLM.
 
     Args:
-        data: Must contain 'content' key
-        config: Must contain 'llm_model_id'
-            Optional: 'prompt_chunk' for custom prompt (falls back to default if not provided)
+        data: ExtractedData with content
 
     Returns:
-        data with 'chunks' list added
+        ExtractedData with chunks populated
     """
-    content = data.get('content', '')
-    model_id = config.get('llm_model_id')
+    data.current_stage = "llm_chunking"
+    content = data.get_text()
+    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
 
     if not content:
-        data['chunks'] = []
-    elif not model_id:
-        print("Warning: llm_model_id not provided, skipping semantic chunking")
-        data['chunks'] = []
-    else:
-        # TODO: Implement actual semantic chunking with LLM
-        # For now, this is a placeholder that supports custom prompts from config
-        # prompt_text = config.get('prompt_chunk')  # Reserved for future implementation
-        data['chunks'] = data.get('chunks', [])
-        data.setdefault('metadata', {})['chunking_method'] = 'llm_semantic'
+        data.chunks = []
+        return data
 
+    if not model_id:
+        data.log_warning("llm_model_id not provided, skipping semantic chunking")
+        data.chunks = []
+        return data
+
+    # Placeholder for semantic chunking implementation
+    data.metadata['chunking_method'] = 'llm_semantic'
     return data
 
 
-def llm_summarize(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def llm_summarize(data: ExtractedData) -> ExtractedData:
     """
     Generate summary of content using Dataloop LLM.
 
     Args:
-        data: Must contain 'content' key
-        config: Must contain 'llm_model_id'
-            Optional: 'prompt_summarize' for custom prompt (falls back to default if not provided)
+        data: ExtractedData with content
 
     Returns:
-        data with 'summary' added to metadata
+        ExtractedData with summary in metadata
     """
-    content = data.get('content', '')
-    model_id = config.get('llm_model_id')
-    generate_summary = config.get('generate_summary', False)
+    data.current_stage = "summarization"
+    content = data.get_text()
+    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
+    generate_summary = getattr(data.config, 'generate_summary', False)
 
-    if content and generate_summary and model_id:
-        try:
-            # Get prompt from config, fall back to default
-            prompt_text = config.get('prompt_summarize')
+    if not content or not generate_summary or not model_id:
+        return data
 
-            if prompt_text:
-                # Use user-defined prompt, replacing {content} placeholder if present
-                prompt = prompt_text.replace('{content}', content[:2000])
-            else:
-                # Default prompt
-                prompt = f"Provide a concise summary of the following text in 2-3 sentences:\n\n{content[:2000]}"
+    try:
+        prompt = f"Provide a concise summary of the following text in 2-3 sentences:\n\n{content[:2000]}"
 
-            # Get dataset from data if available (for temporary item creation)
-            dataset = data.get('target_dataset')
-            response = _call_llm_model(model_id, prompt, dataset)
+        response = _call_llm_model(model_id, prompt, data.target_dataset)
 
-            if response:
-                summary = response.strip()
-                data.setdefault('metadata', {})['summary'] = summary
-                print(f"Generated summary: {summary[:100]}...")
-        except Exception as e:
-            print(f"Warning: Summary generation failed: {e}")
+        if response:
+            data.metadata['summary'] = response.strip()
+    except Exception as e:
+        data.log_warning(f"Summary generation failed: {e}")
 
     return data
 
 
-def llm_extract_entities(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def llm_extract_entities(data: ExtractedData) -> ExtractedData:
     """
     Extract named entities using Dataloop LLM.
 
     Args:
-        data: Must contain 'content' key
-        config: Must contain 'llm_model_id'
-            Optional: 'prompt_entities' for custom prompt (falls back to default if not provided)
+        data: ExtractedData with content
 
     Returns:
-        data with 'entities' added to metadata
+        ExtractedData with entities in metadata
     """
-    content = data.get('content', '')
-    model_id = config.get('llm_model_id')
-    extract_entities = config.get('extract_entities', False)
+    data.current_stage = "entity_extraction"
+    content = data.get_text()
+    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
+    extract_entities = getattr(data.config, 'extract_entities', False)
 
-    if content and extract_entities and model_id:
-        try:
-            # Get prompt from config, fall back to default
-            prompt_text = config.get('prompt_entities')
+    if not content or not extract_entities or not model_id:
+        return data
 
-            if prompt_text:
-                # Use user-defined prompt, replacing {content} placeholder if present
-                prompt = prompt_text.replace('{content}', content[:1000])
-            else:
-                # Default prompt
-                prompt = f"""Extract key entities (people, organizations, locations, dates) from this text.
+    try:
+        prompt = f"""Extract key entities (people, organizations, locations, dates) from this text.
 Return as JSON list.
 
 Text:
 {content[:1000]}"""
 
-            # Get dataset from data if available (for temporary item creation)
-            dataset = data.get('target_dataset')
-            response = _call_llm_model(model_id, prompt, dataset)
+        response = _call_llm_model(model_id, prompt, data.target_dataset)
 
-            if response:
-                try:
-                    entities = json.loads(response)
-                    data.setdefault('metadata', {})['entities'] = entities
-                except (json.JSONDecodeError, ValueError):
-                    # If not valid JSON, store as string
-                    data.setdefault('metadata', {})['entities_raw'] = response
-        except Exception as e:
-            print(f"Warning: Entity extraction failed: {e}")
+        if response:
+            try:
+                entities = json.loads(response)
+                data.metadata['entities'] = entities
+            except (json.JSONDecodeError, ValueError):
+                data.metadata['entities_raw'] = response
+    except Exception as e:
+        data.log_warning(f"Entity extraction failed: {e}")
 
     return data
 
 
-def llm_translate(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def llm_translate(data: ExtractedData) -> ExtractedData:
     """
     Translate content using Dataloop LLM.
 
     Args:
-        data: Must contain 'content' key
-        config: Must contain 'llm_model_id' and 'target_language'
-            Optional: 'prompt_translate' for custom prompt (falls back to default if not provided)
+        data: ExtractedData with content
 
     Returns:
-        data with translated content
+        ExtractedData with translated content
     """
-    content = data.get('content', '')
-    model_id = config.get('llm_model_id')
-    target_lang = config.get('target_language', 'English')
-    translate = config.get('translate', False)
+    data.current_stage = "translation"
+    content = data.get_text()
+    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
+    target_lang = getattr(data.config, 'target_language', 'English')
+    translate = getattr(data.config, 'translate', False)
 
-    if content and translate and model_id:
-        try:
-            # Get prompt from config, fall back to default
-            prompt_text = config.get('prompt_translate')
+    if not content or not translate or not model_id:
+        return data
 
-            if prompt_text:
-                # Use user-defined prompt, replacing {content} and {target_language} placeholders if present
-                prompt = prompt_text.replace('{content}', content).replace('{target_language}', target_lang)
-            else:
-                # Default prompt
-                prompt = f"""Translate the following text to {target_lang}:
+    try:
+        prompt = f"""Translate the following text to {target_lang}:
 
 {content}"""
 
-            # Get dataset from data if available (for temporary item creation)
-            dataset = data.get('target_dataset')
-            response = _call_llm_model(model_id, prompt, dataset)
+        response = _call_llm_model(model_id, prompt, data.target_dataset)
 
-            if response:
-                translated = response.strip()
-
-                # Store original in metadata
-                data.setdefault('metadata', {})['original_content'] = content
-                data.setdefault('metadata', {})['original_language'] = 'auto-detected'
-                data.setdefault('metadata', {})['target_language'] = target_lang
-
-                # Replace content with translation
-                data['content'] = translated
-        except Exception as e:
-            print(f"Warning: Translation failed: {e}")
+        if response:
+            data.metadata['original_content'] = content
+            data.metadata['original_language'] = 'auto-detected'
+            data.metadata['target_language'] = target_lang
+            data.content_text = response.strip()
+    except Exception as e:
+        data.log_warning(f"Translation failed: {e}")
 
     return data

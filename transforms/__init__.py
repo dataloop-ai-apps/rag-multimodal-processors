@@ -1,32 +1,35 @@
 """
-Processing stages for document processing.
-All stages follow signature: (data: dict, config: dict) -> dict
+Processing transforms for document processing.
 
-This consistent signature enables piping and makes stages composable.
+All transforms follow signature: (data: ExtractedData) -> ExtractedData
 """
 
-from .text_normalization import clean_text, normalize_whitespace, remove_empty_lines
-from .chunking import chunk_text, chunk_recursive_with_images, chunk_with_embedded_images, TextChunker
-from .ocr import ocr_enhance, describe_images_with_dataloop
-from .llm import llm_chunk_semantic, llm_summarize
-from utils.upload import upload_to_dataloop
+from .text_normalization import clean, normalize_whitespace, remove_empty_lines
+from .chunking import chunk, chunk_with_images, TextChunker
+from .ocr import ocr_enhance, describe_images, ocr_batch_enhance
+from .llm import llm_chunk_semantic, llm_summarize, llm_extract_entities, llm_translate
+from utils.upload import upload_to_dataloop, upload_metadata_only, dry_run_upload
 
 __all__ = [
     # Text Normalization
-    'clean_text',
+    'clean',
     'normalize_whitespace',
     'remove_empty_lines',
     # Chunking
-    'chunk_text',
-    'chunk_recursive_with_images',
-    'chunk_with_embedded_images',
+    'chunk',
+    'chunk_with_images',
     'TextChunker',
     # OCR
     'ocr_enhance',
-    'describe_images_with_dataloop',
+    'describe_images',
+    'ocr_batch_enhance',
     # LLM
     'llm_chunk_semantic',
     'llm_summarize',
+    'llm_extract_entities',
+    'llm_translate',
     # Upload
     'upload_to_dataloop',
+    'upload_metadata_only',
+    'dry_run_upload',
 ]

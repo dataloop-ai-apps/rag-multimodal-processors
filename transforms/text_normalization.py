@@ -1,55 +1,34 @@
 """
-Text normalization stages for content processing.
-All functions follow signature: (data: dict, config: dict) -> dict
+Text normalization transforms.
+
+All functions follow signature: (data: ExtractedData) -> ExtractedData
 """
 
-from typing import Dict, Any
 import re
+from utils.extracted_data import ExtractedData
 from utils.text_cleaning import clean_text as deep_clean
 
 
-def clean_text(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def clean(data: ExtractedData) -> ExtractedData:
     """
     Clean and normalize text content.
 
     Args:
-        data: Must contain 'content' key with text
-        config: Can contain 'correct_spelling' flag
+        data: ExtractedData with content_text
 
     Returns:
-        data with cleaned 'content'
+        ExtractedData with cleaned_text populated
     """
-    content = data.get('content', '')
+    data.current_stage = "cleaning"
+    content = data.content_text
 
     if not content:
+        data.cleaned_text = ""
         return data
 
     # Basic cleaning
     content = content.strip()
     content = '\n'.join(line.strip() for line in content.split('\n'))
-
-    # Optional spell checking
-    if config.get('correct_spelling', False):
-        content = deep_clean(content)
-
-    data['content'] = content
-    data.setdefault('metadata', {})['preprocessing_applied'] = True
-
-    return data
-
-
-def normalize_whitespace(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normalize whitespace in content.
-
-    Args:
-        data: Must contain 'content' key
-        config: Not used
-
-    Returns:
-        data with normalized whitespace
-    """
-    content = data.get('content', '')
 
     # Replace multiple spaces with single space
     content = re.sub(r' +', ' ', content)
@@ -57,45 +36,45 @@ def normalize_whitespace(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[s
     # Replace multiple newlines with double newline
     content = re.sub(r'\n{3,}', '\n\n', content)
 
-    data['content'] = content
+    data.cleaned_text = content
+    data.metadata['cleaning_applied'] = True
+
     return data
 
 
-def remove_empty_lines(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_whitespace(data: ExtractedData) -> ExtractedData:
+    """
+    Normalize whitespace in content.
+
+    Args:
+        data: ExtractedData with content
+
+    Returns:
+        ExtractedData with normalized text
+    """
+    content = data.get_text()
+
+    # Replace multiple spaces with single space
+    content = re.sub(r' +', ' ', content)
+
+    # Replace multiple newlines with double newline
+    content = re.sub(r'\n{3,}', '\n\n', content)
+
+    data.cleaned_text = content
+    return data
+
+
+def remove_empty_lines(data: ExtractedData) -> ExtractedData:
     """
     Remove empty lines from content.
 
     Args:
-        data: Must contain 'content' key
-        config: Not used
+        data: ExtractedData with content
 
     Returns:
-        data with empty lines removed
+        ExtractedData with empty lines removed
     """
-    content = data.get('content', '')
+    content = data.get_text()
     lines = [line for line in content.split('\n') if line.strip()]
-    data['content'] = '\n'.join(lines)
-    return data
-
-
-def truncate_content(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Truncate content to maximum length.
-
-    Args:
-        data: Must contain 'content' key
-        config: Can contain 'max_content_length'
-
-    Returns:
-        data with truncated content
-    """
-    max_length = config.get('max_content_length')
-
-    if max_length and max_length > 0:
-        content = data.get('content', '')
-        if len(content) > max_length:
-            data['content'] = content[:max_length]
-            data.setdefault('metadata', {})['content_truncated'] = True
-            data['metadata']['original_length'] = len(content)
-
+    data.cleaned_text = '\n'.join(lines)
     return data
