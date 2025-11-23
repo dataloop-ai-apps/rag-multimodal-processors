@@ -111,15 +111,17 @@ Transforms provide composable operations that work across all file types:
 
 **Available Transforms:**
 - **chunking.py**: Text chunking strategies (recursive, semantic, etc.)
-- **preprocessing.py**: Text cleaning and normalization
-- **text_cleaning.py**: Deep text cleaning using unstructured.io
+- **text_normalization.py**: Text cleaning and normalization
 - **ocr.py**: OCR enhancement for images
 - **llm.py**: LLM-based operations (semantic chunking, summarization)
 - **upload.py**: Chunk upload with metadata
 
+**Utilities:**
+- **utils/text_cleaning.py**: Deep text cleaning using unstructured.io
+
 **Example Transform:**
 ```python
-# transforms/preprocessing.py
+# transforms/text_normalization.py
 def clean_text(data: Dict, config: Dict) -> Dict:
     """Clean and normalize text content."""
     text = data.get('text', '')

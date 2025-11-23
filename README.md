@@ -320,8 +320,7 @@ apps/                       # File-type processors (modular, independent)
 transforms/                 # Reusable pipeline transformations
 ├── __init__.py            # Uniform signature: (data, config) -> data
 ├── chunking.py           # Chunking strategies (recursive, semantic, etc.)
-├── preprocessing.py       # Text cleaning and normalization
-├── text_cleaning.py      # Deep text cleaning utilities
+├── text_normalization.py  # Text cleaning and normalization
 ├── ocr.py                # OCR transformation operations
 ├── llm.py                # LLM-based transformations
 └── upload.py             # Upload with per-chunk metadata
