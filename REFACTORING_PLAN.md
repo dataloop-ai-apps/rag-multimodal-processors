@@ -50,9 +50,11 @@ Replace `Dict[str, Any]` with a comprehensive dataclass that exposes all fields:
 ### `utils/extracted_data.py` (NEW FILE)
 ```python
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional
 import dtlpy as dl
 from utils.data_types import ImageContent, TableContent
+from utils.config import Config  # Simple config
+from utils.errors import ErrorTracker  # Simple error tracking
 
 @dataclass
 class ChunkMetadata:
@@ -60,8 +62,6 @@ class ChunkMetadata:
     chunk_index: int
     page_numbers: List[int] = field(default_factory=list)
     image_indices: List[int] = field(default_factory=list)
-    image_ids: List[str] = field(default_factory=list)  # Dataloop IDs after upload
-    has_embedded_images: bool = False
     source_file: Optional[str] = None
 
 @dataclass
@@ -71,7 +71,7 @@ class ExtractedData:
     # === INPUT FIELDS ===
     item: Optional[dl.Item] = None
     target_dataset: Optional[dl.Dataset] = None
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: Config = field(default_factory=Config)  # Simple flat config
 
     # === EXTRACTION OUTPUTS ===
     content_text: str = ""  # Extracted text content
@@ -79,38 +79,28 @@ class ExtractedData:
     tables: List[TableContent] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    # === OCR OUTPUTS ===
-    ocr_text: str = ""  # OCR extracted text
-    ocr_integration_method: Optional[str] = None
-
-    # === CLEANING OUTPUTS ===
+    # === PROCESSING OUTPUTS ===
     cleaned_content: str = ""  # Post-cleaning text
-    cleaning_metadata: Dict[str, Any] = field(default_factory=dict)
-
-    # === CHUNKING OUTPUTS ===
     chunks: List[str] = field(default_factory=list)
     chunk_metadata: List[ChunkMetadata] = field(default_factory=list)
-    chunking_strategy: Optional[str] = None
-
-    # === UPLOAD OUTPUTS ===
     uploaded_items: List[dl.Item] = field(default_factory=list)
-    uploaded_image_ids: Dict[str, str] = field(default_factory=dict)  # path -> item_id
 
-    # === PROCESSING STATE ===
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    # === ERROR TRACKING (SIMPLE) ===
+    errors: ErrorTracker = field(default_factory=ErrorTracker)
     processing_stage: str = "initialized"
 
-    def add_error(self, error: str, stage: Optional[str] = None):
-        """Add error with optional stage info."""
-        if stage:
-            self.errors.append(f"[{stage}] {error}")
-        else:
-            self.errors.append(error)
+    def __post_init__(self):
+        """Setup error tracker with config."""
+        self.errors.error_mode = self.config.error_mode
+        self.errors.max_errors = self.config.max_errors
 
-    def add_warning(self, warning: str):
-        """Add warning message."""
-        self.warnings.append(warning)
+    def log_error(self, message: str) -> bool:
+        """Log error and return whether to continue."""
+        return self.errors.add_error(message, self.processing_stage)
+
+    def log_warning(self, message: str):
+        """Log warning (doesn't stop processing)."""
+        self.errors.add_warning(message)
 
     def get_active_content(self) -> str:
         """Get the current active text content (cleaned if available, else raw)."""
@@ -119,7 +109,26 @@ class ExtractedData:
 
 ---
 
-## 2. SEPARATE EXTRACTION MODULES
+## 2. CONFIGURATION AND ERROR HANDLING
+
+### `utils/config.py` ✅ IMPLEMENTED
+Flat configuration class with validation:
+- **Config**: Single dataclass with all settings
+- `validate()` method checks configuration consistency
+- Two error modes: 'stop' or 'continue'
+- `from_dict()` for creating from dictionaries
+- `to_dict()` for serialization
+
+### `utils/errors.py` ✅ IMPLEMENTED
+Error tracking for pipeline processing:
+- **ErrorTracker**: Tracks errors and warnings
+- `add_error()` returns whether processing should continue
+- Supports 'stop' mode (halt on first error) and 'continue' mode (allow up to max_errors)
+- `get_summary()` for logging
+
+---
+
+## 3. SEPARATE EXTRACTION MODULES
 
 Move extraction logic into dedicated modules:
 
@@ -424,42 +433,55 @@ class PDFProcessor(dl.BaseServiceRunner):
     def run(item: dl.Item,
             target_dataset: dl.Dataset,
             config: Optional[Dict[str, Any]] = None) -> List[dl.Item]:
-        """Main entry point for processing."""
-        config = config or {}
+        """Main entry point with simple error handling."""
 
-        # Initialize ExtractedData
-        data = ExtractedData(
-            item=item,
-            target_dataset=target_dataset,
-            config=config
-        )
+        # Parse config (with fallback to defaults)
+        try:
+            cfg = Config.from_dict(config or {})
+            cfg.validate()
+        except ValueError as e:
+            logger.error(f"Config error: {e}, using defaults")
+            cfg = Config()
 
-        # Execute pipeline steps directly
-        data = PDFExtractor.extract(data)
+        # Initialize data
+        data = ExtractedData(item=item, target_dataset=target_dataset, config=cfg)
 
-        # Add OCR if configured
-        if config.get('use_ocr', False):
-            data = transforms.ocr_enhance(data)
+        # Extract with simple error handling
+        data.processing_stage = "extraction"
+        try:
+            data = PDFExtractor.extract(data)
+        except Exception as e:
+            if not data.log_error(f"Extraction failed: {e}"):
+                return []  # Stop if error_mode is 'stop'
+
+        # OCR (optional, skip on failure)
+        if cfg.use_ocr:
+            data.processing_stage = "ocr"
+            try:
+                data = transforms.ocr_enhance(data)
+            except Exception as e:
+                data.log_warning(f"OCR failed, continuing without: {e}")
 
         # Clean text
+        data.processing_stage = "cleaning"
         data = transforms.clean_text(data)
 
-        # Apply chunking strategy
-        strategy = config.get('chunking_strategy', 'recursive')
-        if strategy != 'none':
-            if config.get('embed_images_in_chunks', False):
-                data = transforms.chunk_with_embedded_images(data)
-            else:
-                data = transforms.chunk_text(data)
+        # Chunk with simple fallback
+        data.processing_stage = "chunking"
+        try:
+            data = transforms.chunk_text(data)
+        except Exception as e:
+            # Try simpler chunking as fallback
+            data.log_warning(f"Advanced chunking failed, trying fixed-size: {e}")
+            data.config.chunking_strategy = 'fixed'
+            data = transforms.chunk_text(data)
 
-        # Upload to dataloop
+        # Upload
+        data.processing_stage = "upload"
         data = transforms.upload_to_dataloop(data)
 
-        # Log any errors/warnings
-        if data.errors:
-            logger.error(f"Processing errors: {data.errors}")
-        if data.warnings:
-            logger.warning(f"Processing warnings: {data.warnings}")
+        # Log summary
+        logger.info(f"Processing complete: {data.errors.get_summary()}")
 
         return data.uploaded_items
 ```
@@ -574,8 +596,17 @@ def process_batch(items: List[dl.Item],
 
 ## 6. IMPLEMENTATION PHASES
 
-### Phase 1: Core Data Structure
-1. Create `utils/extracted_data.py` with `ExtractedData` class
+### Phase 0: Configuration and Error Handling ✅ COMPLETE
+1. ✅ Created `utils/config.py` with `Config` class
+2. ✅ Created `utils/errors.py` with `ErrorTracker`
+3. ✅ Added validation in `Config.validate()` method
+4. ✅ Added tests (36 passing)
+
+### Phase 1: Core Data Structure ✅ COMPLETE
+1. ✅ Created `utils/extracted_data.py` with `ExtractedData` class
+2. ✅ Integrated `ErrorTracker` for error tracking
+3. ✅ Added `Config` for typed configuration
+4. ✅ Added tests (24 passing)
 
 ### Phase 2: Extraction Modules
 1. Create `apps/pdf_processor/pdf_extractor.py`
@@ -612,8 +643,15 @@ def process_batch(items: List[dl.Item],
 
 ### **Type Safety**
 - All data fields are explicitly typed
+- Configuration validated before processing
 - Functions have clear input/output types
-- Errors caught at development time
+- IDE autocomplete and error detection
+
+### **Error Management**
+- Configurable error handling ('stop' or 'continue')
+- Error and warning tracking per stage
+- Maximum error threshold support
+- Clear error summaries for debugging
 
 ### **Clear Data Flow**
 - Visible pipeline with typed stages
@@ -631,7 +669,7 @@ def process_batch(items: List[dl.Item],
 - No shared state or race conditions
 - Thread-safe pipeline execution
 
-### **Simplified Testing**
+### **Testing**
 ```python
 def test_extraction():
     data = ExtractedData(item=test_item)
@@ -666,59 +704,160 @@ data = transforms.chunk_text(data)
 
 ## 8. CONFIGURATION REFERENCE
 
+### Typed Configuration with Validation
 ```python
-config = {
-    # Extraction
-    'extraction_method': 'markdown',  # 'markdown' or 'basic'
-    'extract_images': True,
-    'extract_tables': True,
+from utils.config_schema import ProcessingConfig, ChunkingStrategy, ErrorHandlingMode
 
-    # OCR
-    'use_ocr': False,
-    'ocr_integration_method': 'append',  # 'append', 'prepend', 'per_page', 'separate'
+# Create typed configuration
+config = ProcessingConfig(
+    # Error handling
+    error_mode=ErrorHandlingMode.CONTINUE,  # fail_fast, continue, strict
+    max_errors=10,
 
-    # Chunking
-    'chunking_strategy': 'recursive',  # 'recursive', 'sentence', 'paragraph', 'fixed-size', 'none'
-    'max_chunk_size': 300,
-    'chunk_overlap': 20,
-    'embed_images_in_chunks': False,
-    'link_images_to_chunks': True,
+    # Extraction configuration
+    extraction=ExtractionConfig(
+        method=ExtractionMethod.MARKDOWN,
+        extract_images=True,
+        extract_tables=True,
+        image_quality=95,
+        table_format='markdown'
+    ),
 
-    # Upload
-    'target_dataset_id': 'dataset_id',
-    'upload_metadata': {},
+    # OCR configuration
+    ocr=OCRConfig(
+        enabled=True,
+        model_id='ocr-model-123',
+        integration_method=OCRIntegrationMethod.APPEND,
+        confidence_threshold=0.85,
+        languages=['eng', 'fra']
+    ),
+
+    # Chunking configuration
+    chunking=ChunkingConfig(
+        strategy=ChunkingStrategy.RECURSIVE,
+        max_chunk_size=500,
+        chunk_overlap=50,
+        min_chunk_size=100,
+        preserve_sentences=True,
+        embed_images=False
+    ),
+
+    # Cleaning configuration
+    cleaning=CleaningConfig(
+        normalize_whitespace=True,
+        remove_empty_lines=True,
+        fix_encoding=True,
+        min_line_length=1
+    ),
+
+    # Upload configuration
+    upload=UploadConfig(
+        batch_size=10,
+        parallel_uploads=3,
+        retry_attempts=3,
+        timeout_seconds=300
+    )
+)
+
+# Validate for specific file type
+config.validate_for_file_type('application/pdf')
+
+# Convert to/from dictionary
+config_dict = config.to_dict()
+config_from_dict = ProcessingConfig.from_dict(config_dict)
+```
+
+### Legacy Dictionary Format (auto-converted)
+```python
+# Still supported via from_dict()
+config_dict = {
+    'error_mode': 'continue',
+    'max_errors': 10,
+    'extraction': {
+        'method': 'markdown',
+        'extract_images': True
+    },
+    'ocr': {
+        'enabled': True,
+        'model_id': 'ocr-model-123'
+    },
+    'chunking': {
+        'strategy': 'recursive',
+        'max_chunk_size': 500
+    }
 }
+
+# Auto-converted to typed config
+config = ProcessingConfig.from_dict(config_dict)
 ```
 
 ---
 
 ## 9. EXAMPLE USAGE
 
+### Basic Usage with Error Handling
 ```python
 from main import process_pdf
-from utils.extracted_data import ExtractedData
+from utils.config_schema import ProcessingConfig, ErrorHandlingMode
 
-# Simple usage
-chunks = process_pdf(
-    item=pdf_item,
-    target_dataset=dataset,
-    use_ocr=True,
-    max_chunk_size=500
+# Configure with error handling
+config = ProcessingConfig(
+    error_mode=ErrorHandlingMode.CONTINUE,
+    max_errors=5,
+    ocr={'enabled': True, 'model_id': 'ocr-123'},
+    chunking={'strategy': 'recursive', 'max_chunk_size': 500}
 )
 
-# Advanced usage with custom transforms
+# Process with error recovery
+try:
+    chunks = process_pdf(
+        item=pdf_item,
+        target_dataset=dataset,
+        config=config.to_dict()
+    )
+    print(f"Successfully created {len(chunks)} chunks")
+except Exception as e:
+    print(f"Processing failed: {e}")
+```
+
+### Advanced Usage with Custom Error Recovery
+```python
+from utils.extracted_data import ExtractedData
+from utils.error_handling import ErrorHandler, ErrorContext, ErrorCategory
 from apps.pdf_processor.pdf_extractor import PDFExtractor
 
-# Direct pipeline with custom transform
-data = ExtractedData(item=pdf_item, target_dataset=dataset)
-data = PDFExtractor.extract(data)
-data = my_custom_transform(data)  # Custom transform
-data = transforms.chunk_text(data)
+# Create data with typed config
+config = ProcessingConfig(error_mode=ErrorHandlingMode.CONTINUE)
+data = ExtractedData(item=pdf_item, target_dataset=dataset, config=config)
 
-# Access results
-print(f"Extracted {len(data.images)} images")
+# Register custom recovery strategy
+def custom_extraction_recovery(data, context):
+    print("Attempting custom recovery...")
+    # Implement fallback logic
+    return data
+
+data.error_context.recovery_strategies[ErrorCategory.EXTRACTION] = custom_extraction_recovery
+
+# Execute with error handling
+data = ErrorHandler.safe_execute(
+    PDFExtractor.extract,
+    data.error_context,
+    ErrorCategory.EXTRACTION,
+    'extraction',
+    data
+)
+
+# Check processing state
+if data.should_continue():
+    data = transforms.chunk_text(data)
+else:
+    print(f"Stopping due to errors: {data.error_context.get_summary()}")
+
+# Access detailed results
+summary = data.get_processing_summary()
+print(f"Processed with {summary['error_summary']['total_errors']} errors")
 print(f"Created {len(data.chunks)} chunks")
-print(f"Errors: {data.errors}")
+print(f"Extracted {len(data.images)} images")
 
 # Concurrent processing (enabled by stateless design)
 from concurrent.futures import ThreadPoolExecutor
@@ -738,15 +877,26 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 
 This refactoring delivers:
 
-1. ✅ **Unified `ExtractedData` dataclass** with strong typing
-2. ✅ **Separated extraction logic** into dedicated extractor modules
-3. ✅ **Clear type flow** between all functions
-4. ✅ **Single `run` method** entry point
-5. ✅ **Direct transform calls** for simple, clear pipelines
-6. ✅ **Stateless functions** for safe concurrent execution
-7. ✅ **No legacy compatibility** - clean, modern architecture
+1. ✅ **Typed Configuration** with validation (`utils/config.py`)
+2. ✅ **Error Tracking** with configurable behavior (`utils/errors.py`)
+3. ✅ **Unified `ExtractedData` dataclass** with strong typing
+4. ✅ **Separated extraction logic** into dedicated extractor modules
+5. ✅ **Clear type flow** between all functions
+6. ✅ **Single `run` method** entry point
+7. ✅ **Direct transform calls** for clear pipelines
+8. ✅ **Stateless functions** for concurrent execution
 
-The architecture provides a cleaner, more maintainable, type-safe, and concurrency-ready codebase suitable for production use.
+### Configuration Features:
+- Single `Config` dataclass with all settings
+- Validation via `validate()` method
+- `from_dict()` / `to_dict()` for serialization
+
+### Error Handling Features:
+- Two modes: 'stop' (halt on first error) or 'continue' (allow up to max_errors)
+- Error and warning tracking
+- Stage-aware error messages
+
+The architecture provides a maintainable, type-safe, and concurrency-ready codebase.
 
 ---
 
