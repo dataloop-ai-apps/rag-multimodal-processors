@@ -12,7 +12,7 @@ Usage:
 import sys
 import traceback
 import dtlpy as dl
-from apps.pdf_processor.pdf_processor import PDFProcessor
+from apps.pdf_processor.app import PDFProcessor
 from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, PDF_CONFIG as CONFIG
 
 # Get test item configuration

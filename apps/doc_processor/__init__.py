@@ -1,5 +1,5 @@
 """DOC processor app for Dataloop platform."""
 
-from .doc_processor import DOCProcessor
+from .app import DOCProcessor
 
 __all__ = ['DOCProcessor']

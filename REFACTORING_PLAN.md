@@ -37,7 +37,7 @@ class ExtractedData:
     config: Dict[str, Any] = field(default_factory=dict)
 
     # === EXTRACTION OUTPUTS ===
-    content: str = ""  # Extracted text content
+    content_text: str = ""  # Extracted text content
     images: List[ImageContent] = field(default_factory=list)
     tables: List[TableContent] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -77,7 +77,7 @@ class ExtractedData:
 
     def get_active_content(self) -> str:
         """Get the current active text content (cleaned if available, else raw)."""
-        return self.cleaned_content if self.cleaned_content else self.content
+        return self.cleaned_content if self.cleaned_content else self.content_text
 ```
 
 ---
@@ -129,7 +129,7 @@ class PDFExtractor:
                 )
 
             # Populate ExtractedData
-            data.content = text
+            data.content_text = text
             data.images = images
             data.tables = tables
             data.metadata.update(metadata)
@@ -193,7 +193,7 @@ class DOCExtractor:
             tables = DOCExtractor._extract_tables(doc)
 
             # Populate ExtractedData
-            data.content = text
+            data.content_text = text
             data.images = images
             data.tables = tables
             data.metadata['page_count'] = len(doc.element.xpath('//w:sectPr'))
@@ -351,9 +351,9 @@ def ocr_enhance(data: ExtractedData) -> ExtractedData:
     method = data.config.get('ocr_integration_method', 'append')
 
     if method == 'append':
-        data.content = data.content + "\n\n" + ocr_text
+        data.content_text = data.content_text + "\n\n" + ocr_text
     elif method == 'prepend':
-        data.content = ocr_text + "\n\n" + data.content
+        data.content_text = ocr_text + "\n\n" + data.content_text
 
     data.ocr_text = ocr_text
     data.ocr_integration_method = method
@@ -642,7 +642,7 @@ def process_batch(items: List[dl.Item],
 def test_extraction():
     data = ExtractedData(item=test_item)
     result = PDFExtractor.extract(data)
-    assert result.content != ""
+    assert result.content_text != ""
     assert len(result.images) > 0
 
 def test_pipeline():

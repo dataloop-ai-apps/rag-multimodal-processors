@@ -12,7 +12,7 @@ Usage:
 import sys
 import traceback
 import dtlpy as dl
-from apps.doc_processor.doc_processor import DOCProcessor
+from apps.doc_processor.app import DOCProcessor
 from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, DOC_CONFIG as CONFIG
 
 # Get test item configuration
@@ -23,6 +23,7 @@ ITEM_ID = TEST_ITEMS['doc']['item_id']
 
 if dl.token_expired():
     dl.login()
+
 
 def test_doc_processor():
     """

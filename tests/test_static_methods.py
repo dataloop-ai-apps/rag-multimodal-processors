@@ -12,8 +12,8 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 import dtlpy as dl
 
-from apps.pdf_processor.pdf_processor import PDFProcessor
-from apps.doc_processor.doc_processor import DOCProcessor
+from apps.pdf_processor.app import PDFProcessor
+from apps.doc_processor.app import DOCProcessor
 from utils.chunk_metadata import ChunkMetadata
 
 
@@ -36,7 +36,7 @@ class TestPDFProcessorStaticMethods:
         """Test that upload() is a static method."""
         assert isinstance(PDFProcessor.upload, staticmethod) or hasattr(PDFProcessor, 'upload')
 
-    @patch('apps.pdf_processor.pdf_processor.PDFProcessor.extract_pdf')
+    @patch('apps.pdf_processor.app.PDFProcessor.extract_pdf')
     def test_extract_calls_extract_pdf(self, mock_extract_pdf):
         """Test that extract() calls extract_pdf()."""
         mock_item = Mock(spec=dl.Item)
@@ -47,12 +47,7 @@ class TestPDFProcessorStaticMethods:
         mock_extracted.text = 'test content'
         mock_extracted.images = []
         mock_extracted.tables = []
-        mock_extracted.to_dict.return_value = {
-            'content': 'test content',
-            'images': [],
-            'tables': [],
-            'metadata': {}
-        }
+        mock_extracted.to_dict.return_value = {'content': 'test content', 'images': [], 'tables': [], 'metadata': {}}
         mock_extract_pdf.return_value = mock_extracted
 
         data = {'item': mock_item, 'target_dataset': Mock()}
@@ -65,10 +60,7 @@ class TestPDFProcessorStaticMethods:
 
     def test_clean_processes_content(self):
         """Test that clean() processes content correctly."""
-        data = {
-            'content': '  test   content  \n\n\n',
-            'metadata': {}
-        }
+        data = {'content': '  test   content  \n\n\n', 'metadata': {}}
         config = {}
 
         result = PDFProcessor.clean(data, config)
@@ -78,15 +70,8 @@ class TestPDFProcessorStaticMethods:
 
     def test_chunk_creates_chunks(self):
         """Test that chunk() creates chunks."""
-        data = {
-            'content': 'This is a test document. ' * 100,  # Long enough to chunk
-            'metadata': {}
-        }
-        config = {
-            'chunking_strategy': 'recursive',
-            'max_chunk_size': 100,
-            'chunk_overlap': 20
-        }
+        data = {'content': 'This is a test document. ' * 100, 'metadata': {}}  # Long enough to chunk
+        config = {'chunking_strategy': 'recursive', 'max_chunk_size': 100, 'chunk_overlap': 20}
 
         result = PDFProcessor.chunk(data, config)
 
@@ -124,7 +109,7 @@ class TestChunkMetadata:
             source_file='test.pdf',
             source_dataset_id='dataset123',
             chunk_index=0,
-            total_chunks=10
+            total_chunks=10,
         )
 
         assert metadata.source_item_id == 'item123'
@@ -140,7 +125,7 @@ class TestChunkMetadata:
                 source_file='test.pdf',
                 source_dataset_id='dataset123',
                 chunk_index=0,
-                total_chunks=10
+                total_chunks=10,
             )
 
         with pytest.raises(ValueError, match="chunk_index must be non-negative"):
@@ -149,7 +134,7 @@ class TestChunkMetadata:
                 source_file='test.pdf',
                 source_dataset_id='dataset123',
                 chunk_index=-1,
-                total_chunks=10
+                total_chunks=10,
             )
 
     def test_chunk_metadata_to_dict(self):
@@ -161,7 +146,7 @@ class TestChunkMetadata:
             chunk_index=0,
             total_chunks=10,
             page_numbers=[1, 2],
-            processor='pdf'
+            processor='pdf',
         )
 
         result = metadata.to_dict()
@@ -180,11 +165,7 @@ class TestChunkMetadata:
         mock_item.name = 'test.pdf'
         mock_item.dataset.id = 'dataset123'
 
-        metadata = ChunkMetadata.create(
-            source_item=mock_item,
-            total_chunks=10,
-            chunk_index=0
-        )
+        metadata = ChunkMetadata.create(source_item=mock_item, total_chunks=10, chunk_index=0)
 
         assert metadata.source_item_id == 'item123'
         assert metadata.source_file == 'test.pdf'
@@ -200,7 +181,7 @@ class TestChunkMetadata:
                 'chunk_index': 0,
                 'total_chunks': 10,
                 'extracted_chunk': True,
-                'processing_timestamp': 1234567890.0
+                'processing_timestamp': 1234567890.0,
             }
         }
 
@@ -243,4 +224,3 @@ class TestConcurrentProcessing:
 
         assert result1['content'] == 'test 1'
         assert result2['content'] == 'test 2'
-

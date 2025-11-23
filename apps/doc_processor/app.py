@@ -211,3 +211,4 @@ class DOCProcessor(dl.BaseServiceRunner):
         except Exception as e:
             logger.error(f"Processing failed: {str(e)}", exc_info=True)
             raise
+

@@ -1,5 +1,5 @@
 """PDF processor app for Dataloop platform."""
 
-from .pdf_processor import PDFProcessor
+from .app import PDFProcessor
 
 __all__ = ['PDFProcessor']
