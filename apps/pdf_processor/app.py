@@ -198,11 +198,7 @@ class PDFProcessor(dl.BaseServiceRunner):
         ocr_config['use_ocr'] = True
         # Map integration method values
         integration_method = ocr_config.get('ocr_integration_method', 'append_to_page')
-        method_mapping = {
-            'append_to_page': 'per_page',
-            'separate_chunks': 'separate',
-            'combine_all': 'append',
-        }
+        method_mapping = {'append_to_page': 'per_page', 'separate_chunks': 'separate', 'combine_all': 'append'}
         ocr_config['ocr_integration_method'] = method_mapping.get(integration_method, integration_method)
         return transforms.ocr_enhance(data, ocr_config)
 
@@ -273,4 +269,3 @@ class PDFProcessor(dl.BaseServiceRunner):
         except Exception as e:
             logger.error(f"Processing failed: {str(e)}", exc_info=True)
             raise
-

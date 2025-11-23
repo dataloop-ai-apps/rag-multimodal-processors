@@ -2,7 +2,44 @@
 
 ## Overview
 
-This plan transforms the current dict-based pipeline into a **type-safe architecture** with clear data flow, separated concerns, and composable processing pipelines.
+This plan transforms the current dict-based pipeline into a **type-safe, stateless architecture** with clear data flow, separated concerns, and composable processing pipelines. All callable functions are designed as static methods or pure functions to enable **safe concurrent execution**.
+
+## Core Design Principles for Concurrency
+
+### **Stateless Architecture**
+- **ALL callable functions must be static methods or module-level functions**
+- **NO instance variables** - all state passed through function parameters
+- **NO global state mutations** - functions are pure and side-effect free
+- **Thread-safe by design** - multiple workers can execute the same function concurrently
+
+### **Why Static/Stateless?**
+1. **Concurrency**: Enable parallel processing of multiple documents
+2. **Scalability**: Functions can run in separate threads/processes without conflicts
+3. **Testability**: Pure functions are easier to test in isolation
+4. **Reliability**: No hidden state means predictable behavior
+
+### **Implementation Rules**
+```python
+# ✅ GOOD - Static method (no instance state)
+class PDFExtractor:
+    @staticmethod
+    def extract(data: ExtractedData) -> ExtractedData:
+        # All state in parameters, no self
+        return processed_data
+
+# ✅ GOOD - Module-level function
+def clean_text(data: ExtractedData) -> ExtractedData:
+    # Pure function transformation
+    return cleaned_data
+
+# ❌ BAD - Instance method with state
+class BadProcessor:
+    def __init__(self):
+        self.state = {}  # NO! Prevents concurrency
+
+    def process(self, data):  # NO! Not static
+        self.state['count'] += 1  # NO! Mutates instance state
+```
 
 ---
 
@@ -226,46 +263,17 @@ class DOCExtractor:
 
 ---
 
-## 3. TYPED TRANSFORM INTERFACES
+## 3. TYPED TRANSFORM FUNCTIONS
 
-Create typed wrappers for transforms:
+All transforms are pure functions with typed interfaces:
 
-### `transforms/transform_types.py` (NEW FILE)
+### Transform Function Signature
 ```python
-"""Type definitions for transforms."""
-from typing import Protocol, Callable, List
-import logging
+from typing import Callable
 from utils.extracted_data import ExtractedData
 
-logger = logging.getLogger(__name__)
-
-class TransformProtocol(Protocol):
-    """Protocol for all transform functions."""
-    def __call__(self, data: ExtractedData) -> ExtractedData:
-        """Transform the processing data."""
-        ...
-
-# Type alias for transform functions
+# All transforms follow this signature
 Transform = Callable[[ExtractedData], ExtractedData]
-
-class TransformChain:
-    """Composable chain of transforms."""
-
-    def __init__(self, *transforms: Transform):
-        self.transforms = list(transforms)
-
-    def __call__(self, data: ExtractedData) -> ExtractedData:
-        """Apply all transforms in sequence."""
-        for transform in self.transforms:
-            data = transform(data)
-            if data.errors:
-                logger.warning(f"Errors after {transform.__name__}: {data.errors}")
-        return data
-
-    def add(self, transform: Transform) -> 'TransformChain':
-        """Add transform and return self for chaining."""
-        self.transforms.append(transform)
-        return self
 ```
 
 ### Updated transforms with types:
@@ -394,13 +402,12 @@ def upload_to_dataloop(data: ExtractedData) -> ExtractedData:
 
 ### `apps/pdf_processor/pdf_processor.py` (REFACTORED)
 ```python
-"""Refactored PDF processor with callable pipeline configuration."""
+"""Refactored PDF processor with direct transform calls."""
 import logging
 from typing import List, Dict, Any, Optional
 import dtlpy as dl
 
 from utils.extracted_data import ExtractedData
-from transforms.transform_types import TransformChain
 from .pdf_extractor import PDFExtractor
 import transforms
 
@@ -414,34 +421,6 @@ class PDFProcessor(dl.BaseServiceRunner):
         pass
 
     @staticmethod
-    def build_pipeline(config: Dict[str, Any]) -> TransformChain:
-        """Build processing pipeline based on configuration."""
-        pipeline = TransformChain()
-
-        # Always start with extraction
-        pipeline.add(PDFExtractor.extract)
-
-        # Add OCR if configured
-        if config.get('use_ocr', False):
-            pipeline.add(transforms.ocr_enhance)
-
-        # Add cleaning
-        pipeline.add(transforms.clean_text)
-
-        # Add chunking strategy
-        strategy = config.get('chunking_strategy', 'recursive')
-        if strategy != 'none':
-            if config.get('embed_images_in_chunks', False):
-                pipeline.add(transforms.chunk_with_embedded_images)
-            else:
-                pipeline.add(transforms.chunk_text)
-
-        # Always end with upload
-        pipeline.add(transforms.upload_to_dataloop)
-
-        return pipeline
-
-    @staticmethod
     def run(item: dl.Item,
             target_dataset: dl.Dataset,
             config: Optional[Dict[str, Any]] = None) -> List[dl.Item]:
@@ -455,28 +434,44 @@ class PDFProcessor(dl.BaseServiceRunner):
             config=config
         )
 
-        # Build and execute pipeline
-        pipeline = PDFProcessor.build_pipeline(config)
-        result = pipeline(data)
+        # Execute pipeline steps directly
+        data = PDFExtractor.extract(data)
+
+        # Add OCR if configured
+        if config.get('use_ocr', False):
+            data = transforms.ocr_enhance(data)
+
+        # Clean text
+        data = transforms.clean_text(data)
+
+        # Apply chunking strategy
+        strategy = config.get('chunking_strategy', 'recursive')
+        if strategy != 'none':
+            if config.get('embed_images_in_chunks', False):
+                data = transforms.chunk_with_embedded_images(data)
+            else:
+                data = transforms.chunk_text(data)
+
+        # Upload to dataloop
+        data = transforms.upload_to_dataloop(data)
 
         # Log any errors/warnings
-        if result.errors:
-            logger.error(f"Processing errors: {result.errors}")
-        if result.warnings:
-            logger.warning(f"Processing warnings: {result.warnings}")
+        if data.errors:
+            logger.error(f"Processing errors: {data.errors}")
+        if data.warnings:
+            logger.warning(f"Processing warnings: {data.warnings}")
 
-        return result.uploaded_items
+        return data.uploaded_items
 ```
 
 ### `apps/doc_processor/doc_processor.py` (REFACTORED)
 ```python
-"""Refactored DOC processor with callable pipeline configuration."""
+"""Refactored DOC processor with direct transform calls."""
 import logging
 from typing import List, Dict, Any, Optional
 import dtlpy as dl
 
 from utils.extracted_data import ExtractedData
-from transforms.transform_types import TransformChain
 from .doc_extractor import DOCExtractor
 import transforms
 
@@ -490,24 +485,6 @@ class DOCProcessor(dl.BaseServiceRunner):
         pass
 
     @staticmethod
-    def build_pipeline(config: Dict[str, Any]) -> TransformChain:
-        """Build processing pipeline based on configuration."""
-        pipeline = TransformChain()
-
-        # Core pipeline
-        pipeline.add(DOCExtractor.extract)
-        pipeline.add(transforms.clean_text)
-
-        # Chunking
-        if config.get('chunking_strategy', 'recursive') != 'none':
-            pipeline.add(transforms.chunk_text)
-
-        # Upload
-        pipeline.add(transforms.upload_to_dataloop)
-
-        return pipeline
-
-    @staticmethod
     def run(item: dl.Item,
             target_dataset: dl.Dataset,
             config: Optional[Dict[str, Any]] = None) -> List[dl.Item]:
@@ -521,11 +498,18 @@ class DOCProcessor(dl.BaseServiceRunner):
             config=config
         )
 
-        # Build and execute pipeline
-        pipeline = DOCProcessor.build_pipeline(config)
-        result = pipeline(data)
+        # Execute pipeline steps directly
+        data = DOCExtractor.extract(data)
+        data = transforms.clean_text(data)
 
-        return result.uploaded_items
+        # Chunking
+        if config.get('chunking_strategy', 'recursive') != 'none':
+            data = transforms.chunk_text(data)
+
+        # Upload
+        data = transforms.upload_to_dataloop(data)
+
+        return data.uploaded_items
 ```
 
 ---
@@ -592,7 +576,6 @@ def process_batch(items: List[dl.Item],
 
 ### Phase 1: Core Data Structure
 1. Create `utils/extracted_data.py` with `ExtractedData` class
-2. Create `transforms/transform_types.py` with `TransformChain`
 
 ### Phase 2: Extraction Modules
 1. Create `apps/pdf_processor/pdf_extractor.py`
@@ -605,8 +588,8 @@ def process_batch(items: List[dl.Item],
 3. Test each transform independently
 
 ### Phase 4: Processor Refactoring
-1. Update `PDFProcessor` to use pipeline pattern
-2. Update `DOCProcessor` to use pipeline pattern
+1. Update `PDFProcessor` to directly call transforms
+2. Update `DOCProcessor` to directly call transforms
 3. Remove `process_document` method (unified with `run`)
 
 ### Phase 5: Main API Update
@@ -615,8 +598,13 @@ def process_batch(items: List[dl.Item],
 
 ### Phase 6: Testing
 1. Update all tests to use new data structures
-2. Add tests for pipeline configuration
+2. Add tests for direct transform calls
 3. Add tests for error handling
+
+### Phase 7: Optional - TransformChain Enhancement (OPTIONAL)
+1. Create `transforms/transform_chain.py` with `TransformChain` class
+2. Enable composable pipeline configuration
+3. Add support for dynamic pipeline building
 
 ---
 
@@ -637,6 +625,12 @@ def process_batch(items: List[dl.Item],
 - Transforms are independent and composable
 - Clean interface between components
 
+### **Concurrency Support**
+- All transforms are stateless functions
+- Safe parallel processing of multiple documents
+- No shared state or race conditions
+- Thread-safe pipeline execution
+
 ### **Simplified Testing**
 ```python
 def test_extraction():
@@ -646,24 +640,26 @@ def test_extraction():
     assert len(result.images) > 0
 
 def test_pipeline():
-    pipeline = TransformChain(
-        PDFExtractor.extract,
-        transforms.clean_text,
-        transforms.chunk_text
-    )
+    # Direct transform calls
     data = ExtractedData(item=test_item)
-    result = pipeline(data)
-    assert len(result.chunks) > 0
+    data = PDFExtractor.extract(data)
+    data = transforms.clean_text(data)
+    data = transforms.chunk_text(data)
+    assert len(data.chunks) > 0
 ```
 
-### **Configurable Pipelines**
+### **Extensible Architecture**
 ```python
-# Custom pipeline for specific use case
-custom_pipeline = TransformChain(
-    PDFExtractor.extract,
-    CustomTransform.my_transform,  # Easy to add custom steps
-    transforms.chunk_text
-)
+# Easy to add custom transforms
+def my_custom_transform(data: ExtractedData) -> ExtractedData:
+    # Custom processing logic
+    data.metadata['custom_processed'] = True
+    return data
+
+# Use in pipeline
+data = PDFExtractor.extract(data)
+data = my_custom_transform(data)  # Insert custom step
+data = transforms.chunk_text(data)
 ```
 
 ---
@@ -710,23 +706,30 @@ chunks = process_pdf(
     max_chunk_size=500
 )
 
-# Advanced usage with custom pipeline
-from apps.pdf_processor import PDFProcessor
-from transforms import TransformChain
+# Advanced usage with custom transforms
+from apps.pdf_processor.pdf_extractor import PDFExtractor
 
-# Build custom pipeline
+# Direct pipeline with custom transform
 data = ExtractedData(item=pdf_item, target_dataset=dataset)
-custom_pipeline = TransformChain(
-    PDFExtractor.extract,
-    MyCustomTransform.process,
-    transforms.chunk_text
-)
-result = custom_pipeline(data)
+data = PDFExtractor.extract(data)
+data = my_custom_transform(data)  # Custom transform
+data = transforms.chunk_text(data)
 
 # Access results
-print(f"Extracted {len(result.images)} images")
-print(f"Created {len(result.chunks)} chunks")
-print(f"Errors: {result.errors}")
+print(f"Extracted {len(data.images)} images")
+print(f"Created {len(data.chunks)} chunks")
+print(f"Errors: {data.errors}")
+
+# Concurrent processing (enabled by stateless design)
+from concurrent.futures import ThreadPoolExecutor
+
+def process_single(item):
+    return process_pdf(item, dataset, use_ocr=True)
+
+# Process multiple PDFs in parallel
+with ThreadPoolExecutor(max_workers=4) as executor:
+    items = [pdf1, pdf2, pdf3, pdf4]
+    results = list(executor.map(process_single, items))
 ```
 
 ---
@@ -739,7 +742,85 @@ This refactoring delivers:
 2. ✅ **Separated extraction logic** into dedicated extractor modules
 3. ✅ **Clear type flow** between all functions
 4. ✅ **Single `run` method** entry point
-5. ✅ **Callable pipeline configuration** via `build_pipeline()`
-6. ✅ **No legacy compatibility** - clean, modern architecture
+5. ✅ **Direct transform calls** for simple, clear pipelines
+6. ✅ **Stateless functions** for safe concurrent execution
+7. ✅ **No legacy compatibility** - clean, modern architecture
 
-The architecture provides a cleaner, more maintainable, and type-safe codebase suitable for production use.
+The architecture provides a cleaner, more maintainable, type-safe, and concurrency-ready codebase suitable for production use.
+
+---
+
+## 10. OPTIONAL ENHANCEMENT: TransformChain
+
+For advanced use cases requiring dynamic pipeline composition, an optional `TransformChain` class can be added:
+
+### `transforms/transform_chain.py` (OPTIONAL)
+```python
+"""Optional transform chain for composable pipelines."""
+from typing import List, Callable
+import logging
+from utils.extracted_data import ExtractedData
+
+logger = logging.getLogger(__name__)
+
+# Type alias for transform functions
+Transform = Callable[[ExtractedData], ExtractedData]
+
+class TransformChain:
+    """Composable chain of transforms for advanced pipeline configuration."""
+
+    def __init__(self, *transforms: Transform):
+        """Initialize with transform functions."""
+        self.transforms = list(transforms)
+
+    def __call__(self, data: ExtractedData) -> ExtractedData:
+        """Apply all transforms in sequence."""
+        for transform in self.transforms:
+            try:
+                data = transform(data)
+                if data.errors:
+                    logger.warning(f"Errors after {transform.__name__}: {data.errors}")
+            except Exception as e:
+                data.add_error(f"Transform {transform.__name__} failed: {str(e)}")
+                logger.error(f"Transform failed: {e}", exc_info=True)
+        return data
+
+    def add(self, transform: Transform) -> 'TransformChain':
+        """Add transform and return self for chaining."""
+        self.transforms.append(transform)
+        return self
+
+    @staticmethod
+    def from_config(config: dict) -> 'TransformChain':
+        """Build chain from configuration dictionary."""
+        chain = TransformChain()
+        # Add transforms based on config
+        return chain
+```
+
+### Usage Example with TransformChain
+```python
+from transforms.transform_chain import TransformChain
+
+# Create reusable pipeline
+pdf_pipeline = TransformChain(
+    PDFExtractor.extract,
+    transforms.ocr_enhance,
+    transforms.clean_text,
+    transforms.chunk_text,
+    transforms.upload_to_dataloop
+)
+
+# Process multiple items with same pipeline
+for item in items:
+    data = ExtractedData(item=item, target_dataset=dataset)
+    result = pdf_pipeline(data)
+```
+
+### Benefits of TransformChain
+- **Dynamic composition**: Build pipelines at runtime based on configuration
+- **Reusability**: Create once, use many times
+- **Error handling**: Built-in error propagation and logging
+- **Testing**: Easy to mock and test pipeline combinations
+
+This remains **completely optional** - the core architecture works perfectly with direct transform calls.
