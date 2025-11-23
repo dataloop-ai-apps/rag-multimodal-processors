@@ -1,182 +1,109 @@
 """
 DOC/DOCX processor app.
 
-DOCX processor with all extraction and processing logic.
+DOCX processor that uses DOCExtractor and ExtractedData throughout.
 """
 
 import logging
-import os
-import tempfile
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 import dtlpy as dl
-from docx import Document
 
 import transforms
-from utils.data_types import ExtractedContent, ImageContent, TableContent
+from utils.extracted_data import ExtractedData
+from utils.config import Config
+from .doc_extractor import DOCExtractor
 
-logger = logging.getLogger("rag-preprocessor")
+logger = logging.getLogger(__name__)
 
 
 class DOCProcessor(dl.BaseServiceRunner):
     """
     DOCX processing application.
 
-    Supports:
-    - Text extraction from DOC/DOCX files
-    - Table extraction
-    - Multiple chunking strategies
-    - Text cleaning and normalization
+    Uses ExtractedData as the data structure throughout the pipeline.
     """
 
     def __init__(self):
         """Initialize DOC processor."""
-        # Configure Dataloop client timeouts
         dl.client_api._upload_session_timeout = 60
         dl.client_api._upload_chuck_timeout = 30
 
     @staticmethod
-    def extract_docx(item: dl.Item, config: Dict[str, Any]) -> ExtractedContent:
-        """
-        Extract content from DOCX
-
-        Args:
-            item: Dataloop DOCX item to extract from
-            config: Processing configuration dict
-
-        Returns:
-            ExtractedContent: Extracted content with text, images, and tables
-        """
-        with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = item.download(local_path=temp_dir)
-            doc = Document(file_path)
-
-            result = ExtractedContent()
-
-            # Extract paragraphs
-            paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
-            result.text = '\n\n'.join(paragraphs)
-
-            # Extract images if requested
-            if config.get('extract_images', True):
-                result.images = DOCProcessor._extract_images(doc, temp_dir)
-
-            # Extract tables if requested
-            if config.get('extract_tables', False):
-                result.tables = DOCProcessor._extract_tables(doc)
-
-            result.metadata = {
-                'paragraph_count': len(paragraphs),
-                'source_file': item.name,
-                'image_count': len(result.images),
-                'table_count': len(result.tables),
-                'processor': 'doc',
-            }
-
-            return result
+    def extract(data: ExtractedData) -> ExtractedData:
+        """Extract content from DOCX."""
+        return DOCExtractor.extract(data)
 
     @staticmethod
-    def _extract_images(doc, temp_dir: str) -> List[ImageContent]:
-        """Extract embedded images from .docx"""
-        images = []
-
-        try:
-            # .docx images are in doc.part.rels
-            for rel in doc.part.rels.values():
-                if "image" in rel.target_ref:
-                    image_path = os.path.join(temp_dir, rel.target_ref.split('/')[-1])
-                    with open(image_path, 'wb') as f:
-                        f.write(rel.target_part.blob)
-
-                    # Extract file extension
-                    ext = rel.target_ref.split('.')[-1] if '.' in rel.target_ref else None
-
-                    images.append(
-                        ImageContent(path=image_path, format=ext, caption=None, page_number=None, bbox=None, size=None)
-                    )
-        except Exception as e:
-            logger.warning(f"Failed to extract images from .docx: {e}")
-
-        return images
-
-    @staticmethod
-    def _extract_tables(doc) -> List[TableContent]:
-        """Extract tables from .docx"""
-        tables = []
-
-        for table in doc.tables:
-            try:
-                # Convert to list of dicts
-                rows = []
-                headers = [cell.text for cell in table.rows[0].cells]
-
-                for row in table.rows[1:]:
-                    row_data = {headers[i]: cell.text for i, cell in enumerate(row.cells)}
-                    rows.append(row_data)
-
-                # Convert to markdown
-                markdown = DOCProcessor._table_to_markdown(headers, rows)
-
-                tables.append(TableContent(data=rows, markdown=markdown))
-            except Exception as e:
-                logger.warning(f"Failed to extract table: {e}")
-
-        return tables
-
-    @staticmethod
-    def _table_to_markdown(headers: List[str], rows: List[Dict]) -> str:
-        """Convert table to markdown format"""
-        md = "| " + " | ".join(headers) + " |\n"
-        md += "| " + " | ".join(["---"] * len(headers)) + " |\n"
-
-        for row in rows:
-            md += "| " + " | ".join([str(row.get(h, '')) for h in headers]) + " |\n"
-
-        return md
-
-    @staticmethod
-    def extract(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract content from DOCX file."""
-        item = data.get('item')
-        if not item:
-            raise ValueError("Missing 'item' in data")
-
-        extracted = DOCProcessor.extract_docx(item, config)
-        data.update(extracted.to_dict())
-        return data
-
-    @staticmethod
-    def clean(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    def clean(data: ExtractedData) -> ExtractedData:
         """Clean and normalize text."""
-        data = transforms.clean_text(data, config)
-        data = transforms.normalize_whitespace(data, config)
+        data.current_stage = "cleaning"
+        try:
+            data_dict = {'content': data.content_text}
+            config_dict = data.config.to_dict()
+
+            data_dict = transforms.clean_text(data_dict, config_dict)
+            data_dict = transforms.normalize_whitespace(data_dict, config_dict)
+
+            data.cleaned_text = data_dict.get('content', data.content_text)
+        except Exception as e:
+            data.log_warning(f"Cleaning failed: {e}")
+            data.cleaned_text = data.content_text
+
         return data
 
     @staticmethod
-    def chunk(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    def chunk(data: ExtractedData) -> ExtractedData:
         """Chunk content based on strategy."""
-        strategy = config.get('chunking_strategy', 'recursive')
-        link_images = config.get('link_images_to_chunks', True)
-        embed_images = config.get('embed_images_in_chunks', False)
-        has_images = len(data.get('images', [])) > 0
+        data.current_stage = "chunking"
+        try:
+            data_dict = {
+                'content': data.get_text(),
+                'images': [img.to_dict() for img in data.images],
+                'tables': [tbl.to_dict() for tbl in data.tables],
+                'metadata': data.metadata,
+            }
+            config_dict = data.config.to_dict()
 
-        if strategy == 'recursive' and has_images:
-            if embed_images:
-                data = transforms.chunk_with_embedded_images(data, config)
-            elif link_images:
-                data = transforms.chunk_recursive_with_images(data, config)
+            strategy = data.config.chunking_strategy
+            has_images = data.has_images()
+
+            if strategy == 'recursive' and has_images:
+                data_dict = transforms.chunk_recursive_with_images(data_dict, config_dict)
+            elif strategy == 'semantic':
+                data_dict = transforms.llm_chunk_semantic(data_dict, config_dict)
             else:
-                data = transforms.chunk_text(data, config)
-        elif strategy == 'semantic':
-            data = transforms.llm_chunk_semantic(data, config)
-        else:
-            data = transforms.chunk_text(data, config)
+                data_dict = transforms.chunk_text(data_dict, config_dict)
+
+            data.chunks = data_dict.get('chunks', [])
+            data.chunk_metadata = data_dict.get('chunk_metadata', [])
+        except Exception as e:
+            if not data.log_error(f"Chunking failed: {e}"):
+                return data
+
         return data
 
     @staticmethod
-    def upload(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    def upload(data: ExtractedData) -> ExtractedData:
         """Upload chunks to Dataloop."""
-        return transforms.upload_to_dataloop(data, config)
+        data.current_stage = "upload"
+        try:
+            data_dict = {
+                'item': data.item,
+                'target_dataset': data.target_dataset,
+                'chunks': data.chunks,
+                'chunk_metadata': data.chunk_metadata,
+                'images': [img.to_dict() for img in data.images],
+                'metadata': data.metadata,
+            }
+            config_dict = data.config.to_dict()
+
+            result = transforms.upload_to_dataloop(data_dict, config_dict)
+            data.uploaded_items = result.get('uploaded_items', [])
+        except Exception as e:
+            data.log_error(f"Upload failed: {e}")
+
+        return data
 
     @staticmethod
     def process_document(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
@@ -185,7 +112,7 @@ class DOCProcessor(dl.BaseServiceRunner):
         return DOCProcessor.run(item, target_dataset, config)
 
     @staticmethod
-    def run(item: dl.Item, target_dataset: dl.Dataset, config: Dict[str, Any]) -> List[dl.Item]:
+    def run(item: dl.Item, target_dataset: dl.Dataset, config: Optional[Dict[str, Any]] = None) -> List[dl.Item]:
         """
         Process a DOCX document into chunks.
 
@@ -197,17 +124,18 @@ class DOCProcessor(dl.BaseServiceRunner):
         Returns:
             List of uploaded chunk items
         """
-        try:
-            data = {'item': item, 'target_dataset': target_dataset}
-            data = DOCProcessor.extract(data, config)
-            data = DOCProcessor.clean(data, config)
-            data = DOCProcessor.chunk(data, config)
-            data = DOCProcessor.upload(data, config)
+        cfg = Config.from_dict(config or {})
+        data = ExtractedData(item=item, target_dataset=target_dataset, config=cfg)
 
-            uploaded = data.get('uploaded_items', [])
-            logger.info(f"Processed {item.name}: {len(uploaded)} chunks")
-            return uploaded
+        try:
+            data = DOCProcessor.extract(data)
+            data = DOCProcessor.clean(data)
+            data = DOCProcessor.chunk(data)
+            data = DOCProcessor.upload(data)
+
+            logger.info(f"Processed {item.name}: {len(data.uploaded_items)} chunks, {data.errors.get_summary()}")
+            return data.uploaded_items
 
         except Exception as e:
-            logger.error(f"Processing failed: {str(e)}", exc_info=True)
+            logger.error(f"Processing failed: {e}", exc_info=True)
             raise

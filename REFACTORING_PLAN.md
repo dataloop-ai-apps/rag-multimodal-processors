@@ -608,10 +608,11 @@ def process_batch(items: List[dl.Item],
 3. ✅ Added `Config` for typed configuration
 4. ✅ Added tests (24 passing)
 
-### Phase 2: Extraction Modules
-1. Create `apps/pdf_processor/pdf_extractor.py`
-2. Create `apps/doc_processor/doc_extractor.py`
-3. Move extraction logic from processors to extractors
+### Phase 2: Extraction Modules ✅ COMPLETE
+1. ✅ Created `apps/pdf_processor/pdf_extractor.py`
+2. ✅ Created `apps/doc_processor/doc_extractor.py`
+3. ✅ Extractors work with `ExtractedData`
+4. ✅ Added tests (16 passing)
 
 ### Phase 3: Transform Updates
 1. Update each transform to use `ExtractedData`

@@ -6,6 +6,13 @@ Each app is a separate Dataloop application with its own Dockerfile and configur
 """
 
 from .pdf_processor.app import PDFProcessor
+from .pdf_processor.pdf_extractor import PDFExtractor
 from .doc_processor.app import DOCProcessor
+from .doc_processor.doc_extractor import DOCExtractor
 
-__all__ = ['PDFProcessor', 'DOCProcessor']
+__all__ = [
+    'PDFProcessor',
+    'PDFExtractor',
+    'DOCProcessor',
+    'DOCExtractor',
+]
