@@ -653,6 +653,57 @@ def process_batch(items: List[dl.Item],
 2. Enable composable pipeline configuration
 3. Add support for dynamic pipeline building
 
+### Phase 8: Processor Simplification ✅ COMPLETE
+Simplify processor classes by removing wrapper methods and calling transforms directly.
+
+**Changes:**
+1. ✅ Move chunking strategy logic into `transforms.chunk()` - centralize decision making
+2. ✅ Remove static wrapper methods (`extract`, `clean`, `chunk`, `upload`)
+3. ✅ Call transforms/extractors directly in static `run()` method
+
+**Before:**
+```python
+class PDFProcessor:
+    @staticmethod
+    def extract(data): return PDFExtractor.extract(data)  # wrapper
+    @staticmethod
+    def clean(data): return transforms.clean(data)  # wrapper
+    @staticmethod
+    def chunk(data):  # duplicated logic in both processors
+        if strategy == 'semantic': return transforms.llm_chunk_semantic(data)
+        elif has_images: return transforms.chunk_with_images(data)
+        else: return transforms.chunk(data)
+```
+
+**After:**
+```python
+class PDFProcessor:
+    def __init__(self):
+        # Just setup (NLTK, timeouts, etc.)
+
+    @staticmethod
+    def run(item, target_dataset, context):
+        config = context.node.metadata.get('customNodeConfig', {})
+        cfg = Config.from_dict(config)
+        data = ExtractedData(item=item, target_dataset=target_dataset, config=cfg)
+        data = PDFExtractor.extract(data)
+        data = transforms.clean(data)
+        data = transforms.chunk(data)  # smart chunk handles strategy
+        data = transforms.upload_to_dataloop(data)
+        return data.uploaded_items
+```
+
+**Smart `chunk()` in transforms/chunking.py:**
+```python
+def chunk(data: ExtractedData) -> ExtractedData:
+    strategy = data.config.chunking_strategy
+    if strategy == 'semantic':
+        return llm_chunk_semantic(data)
+    elif strategy == 'recursive' and data.has_images():
+        return chunk_with_images(data)
+    # ... existing chunking logic
+```
+
 ---
 
 ## 7. KEY BENEFITS

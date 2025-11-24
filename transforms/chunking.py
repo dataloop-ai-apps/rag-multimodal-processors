@@ -76,6 +76,11 @@ def chunk(data: ExtractedData) -> ExtractedData:
     """
     Chunk content using the strategy specified in config.
 
+    Handles strategy selection internally:
+    - 'semantic': Uses LLM-based semantic chunking
+    - 'recursive' with images: Uses chunk_with_images for page/image association
+    - Other strategies: Uses TextChunker (fixed, recursive, sentence, none)
+
     Args:
         data: ExtractedData with content
 
@@ -83,8 +88,16 @@ def chunk(data: ExtractedData) -> ExtractedData:
         ExtractedData with chunks populated
     """
     data.current_stage = "chunking"
-    content = data.get_text()
+    strategy = data.config.chunking_strategy
 
+    if strategy == 'semantic':
+        from .llm import llm_chunk_semantic
+        return llm_chunk_semantic(data)
+
+    if strategy == 'recursive' and data.has_images():
+        return chunk_with_images(data)
+
+    content = data.get_text()
     if not content:
         data.chunks = []
         return data
@@ -92,11 +105,11 @@ def chunk(data: ExtractedData) -> ExtractedData:
     chunker = TextChunker(
         chunk_size=data.config.max_chunk_size,
         chunk_overlap=data.config.chunk_overlap,
-        strategy=data.config.chunking_strategy,
+        strategy=strategy,
     )
 
     data.chunks = chunker.chunk(content)
-    data.metadata['chunking_strategy'] = data.config.chunking_strategy
+    data.metadata['chunking_strategy'] = strategy
     data.metadata['chunk_count'] = len(data.chunks)
 
     return data
