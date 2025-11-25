@@ -1,9 +1,9 @@
 """
-Tests for data type classes (ExtractedContent, ImageContent, TableContent).
+Tests for data type classes (ImageContent, TableContent).
 """
 
 import pytest
-from utils.data_types import ExtractedContent, ImageContent, TableContent
+from utils.data_types import ImageContent, TableContent
 
 
 class TestImageContent:
@@ -64,50 +64,3 @@ class TestTableContent:
         assert 'markdown' in result
         assert 'html' in result
         assert result['page_number'] == 1
-
-
-class TestExtractedContent:
-    """Test ExtractedContent dataclass."""
-
-    def test_extracted_content_creation(self):
-        """Test creating ExtractedContent instance."""
-        content = ExtractedContent(text='Test text', images=[], tables=[], metadata={'source': 'test'})
-
-        assert content.text == 'Test text'
-        assert len(content.images) == 0
-        assert len(content.tables) == 0
-        assert content.metadata['source'] == 'test'
-
-    def test_extracted_content_with_images(self):
-        """Test ExtractedContent with images."""
-        images = [ImageContent(path='/tmp/img1.png', page_number=1), ImageContent(path='/tmp/img2.png', page_number=2)]
-
-        content = ExtractedContent(text='Test', images=images)
-
-        assert len(content.images) == 2
-        assert content.has_images() is True
-        assert content.has_tables() is False
-
-    def test_extracted_content_with_tables(self):
-        """Test ExtractedContent with tables."""
-        tables = [TableContent(data=[{'col': 'val'}], markdown='| col |\n| val |')]
-
-        content = ExtractedContent(text='Test', tables=tables)
-
-        assert len(content.tables) == 1
-        assert content.has_tables() is True
-        assert content.has_images() is False
-
-    def test_extracted_content_to_dict(self):
-        """Test converting ExtractedContent to dictionary."""
-        images = [ImageContent(path='/tmp/img.png', page_number=1)]
-        tables = [TableContent(data=[], markdown='| col |')]
-
-        content = ExtractedContent(text='Test text', images=images, tables=tables, metadata={'source': 'test'})
-
-        result = content.to_dict()
-
-        assert result['content'] == 'Test text'
-        assert len(result['images']) == 1
-        assert len(result['tables']) == 1
-        assert result['metadata']['source'] == 'test'

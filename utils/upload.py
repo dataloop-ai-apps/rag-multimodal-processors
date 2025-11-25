@@ -4,17 +4,11 @@ Upload transforms for storing chunks in Dataloop.
 All functions follow signature: (data: ExtractedData) -> ExtractedData
 """
 
-from typing import Dict, Any, List
-from pathlib import Path
-
-import dtlpy as dl
-import pandas as pd
-
 from .dataloop_helpers import upload_chunks
-from .chunk_metadata import ChunkMetadata
+from .extracted_data import ExtractedData
 
 
-def upload_to_dataloop(data) -> Any:
+def upload_to_dataloop(data: ExtractedData) -> ExtractedData:
     """
     Upload chunks to Dataloop dataset with optional image associations.
 
@@ -47,22 +41,14 @@ def upload_to_dataloop(data) -> Any:
             ]
             chunk_meta['image_ids'] = actual_image_ids
 
-    if chunk_metadata_list and len(chunk_metadata_list) == len(data.chunks):
-        uploaded_items = upload_chunks_bulk(
-            chunks=data.chunks,
-            chunk_metadata_list=chunk_metadata_list,
-            source_item=data.item,
-            target_dataset=data.target_dataset,
-            processor_metadata=data.metadata,
-        )
-    else:
-        uploaded_items = upload_chunks(
-            chunks=data.chunks,
-            source_item=data.item,
-            target_dataset=data.target_dataset,
-            remote_path='/chunks',
-            processor_metadata=data.metadata,
-        )
+    uploaded_items = upload_chunks(
+        chunks=data.chunks,
+        source_item=data.item,
+        target_dataset=data.target_dataset,
+        remote_path='/chunks',
+        processor_metadata=data.metadata,
+        chunk_metadata_list=chunk_metadata_list if chunk_metadata_list else None,
+    )
 
     data.uploaded_items = uploaded_items
     data.metadata['uploaded_count'] = len(uploaded_items)
@@ -70,89 +56,7 @@ def upload_to_dataloop(data) -> Any:
     return data
 
 
-def upload_chunks_bulk(
-    chunks: List[str],
-    chunk_metadata_list: List[Dict[str, Any]],
-    source_item: dl.Item,
-    target_dataset: dl.Dataset,
-    processor_metadata: Dict[str, Any],
-) -> List[dl.Item]:
-    """
-    Optimized bulk upload using pandas DataFrame.
-
-    Args:
-        chunks: List of text chunks to upload
-        chunk_metadata_list: List of metadata dicts (one per chunk)
-        source_item: Source document item
-        target_dataset: Target dataset for chunks
-        processor_metadata: Processor-specific metadata
-
-    Returns:
-        List of uploaded chunk items
-    """
-    records = []
-    for idx, (chunk_text, chunk_meta) in enumerate(zip(chunks, chunk_metadata_list)):
-        chunk_context = {
-            **processor_metadata,
-            **{
-                k: v
-                for k, v in chunk_meta.items()
-                if k not in ['chunk_index', 'page_numbers', 'image_ids', 'image_indices']
-            },
-        }
-
-        metadata = ChunkMetadata.create(
-            source_item=source_item,
-            total_chunks=len(chunks),
-            chunk_index=idx,
-            page_numbers=chunk_meta.get('page_numbers'),
-            image_ids=chunk_meta.get('image_ids', []),
-            processor=processor_metadata.get('processor'),
-            extraction_method=processor_metadata.get('extraction_method'),
-            processor_specific_metadata=chunk_context,
-        ).to_dict()
-
-        base_name = Path(source_item.name).stem
-        records.append(
-            {
-                'filename': f"{base_name}_chunk_{idx:04d}.txt",
-                'text': chunk_text,
-                'metadata': metadata,
-                'remote_path': f'/chunks/{source_item.dir.lstrip("/")}'.replace('\\', '/'),
-            }
-        )
-
-    df = pd.DataFrame(records)
-
-    try:
-        uploaded_items = target_dataset.items.upload_dataframe(
-            df=df,
-            item_metadata_column='metadata',
-            remote_path_column='remote_path',
-            local_path_column='text',
-            file_name_column='filename',
-            overwrite=True,
-        )
-
-        if uploaded_items is None:
-            raise dl.PlatformException(f"No chunks were uploaded! Total chunks: {len(chunks)}")
-        elif isinstance(uploaded_items, dl.Item):
-            uploaded_items = [uploaded_items]
-        else:
-            uploaded_items = [item for item in uploaded_items]
-
-        return uploaded_items
-    except AttributeError:
-        return upload_chunks(
-            chunks=chunks,
-            source_item=source_item,
-            target_dataset=target_dataset,
-            remote_path='/chunks',
-            processor_metadata=processor_metadata,
-        )
-
-
-def upload_metadata_only(data) -> Any:
+def upload_metadata_only(data: ExtractedData) -> ExtractedData:
     """
     Upload only metadata without creating chunk items.
 
@@ -180,7 +84,7 @@ def upload_metadata_only(data) -> Any:
     return data
 
 
-def dry_run_upload(data) -> Any:
+def dry_run_upload(data: ExtractedData) -> ExtractedData:
     """
     Simulate upload without actually uploading.
 

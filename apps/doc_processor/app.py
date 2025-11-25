@@ -14,7 +14,7 @@ from utils.extracted_data import ExtractedData
 from utils.config import Config
 from .doc_extractor import DOCExtractor
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rag-preprocessor")
 
 
 class DOCProcessor(dl.BaseServiceRunner):

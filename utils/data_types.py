@@ -46,31 +46,3 @@ class TableContent:
             'page_number': self.page_number,
             'location': self.location,
         }
-
-
-@dataclass
-class ExtractedContent:
-    """
-    Multimodal content extracted from document.
-    Can contain text, images, tables, etc.
-    """
-
-    text: str = ""  # Main text content
-    images: List[ImageContent] = field(default_factory=list)
-    tables: List[TableContent] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self):
-        """Convert to dictionary for pipeline processing"""
-        return {
-            'content': self.text,
-            'images': [img.to_dict() for img in self.images],
-            'tables': [tbl.to_dict() for tbl in self.tables],
-            'metadata': self.metadata,
-        }
-
-    def has_images(self) -> bool:
-        return len(self.images) > 0
-
-    def has_tables(self) -> bool:
-        return len(self.tables) > 0

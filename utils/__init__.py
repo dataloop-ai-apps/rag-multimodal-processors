@@ -9,7 +9,7 @@ from .chunk_metadata import ChunkMetadata
 from .config import Config
 from .errors import ErrorTracker
 from .extracted_data import ExtractedData
-from .data_types import ImageContent, TableContent, ExtractedContent
+from .data_types import ImageContent, TableContent
 
 __all__ = [
     # Dataloop helpers
@@ -22,7 +22,6 @@ __all__ = [
     'ExtractedData',
     'ImageContent',
     'TableContent',
-    'ExtractedContent',
     # Configuration and error handling
     'Config',
     'ErrorTracker',

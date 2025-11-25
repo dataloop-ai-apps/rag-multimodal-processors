@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import List
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rag-preprocessor")
 
 
 @dataclass

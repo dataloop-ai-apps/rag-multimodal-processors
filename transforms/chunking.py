@@ -12,7 +12,7 @@ from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTe
 
 from utils.extracted_data import ExtractedData
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rag-preprocessor")
 
 
 class TextChunker:

@@ -19,7 +19,7 @@ except ImportError:
 from utils.extracted_data import ExtractedData
 from utils.data_types import ImageContent, TableContent
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rag-preprocessor")
 
 
 class DOCExtractor:

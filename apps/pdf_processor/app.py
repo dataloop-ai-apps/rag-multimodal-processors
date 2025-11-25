@@ -15,7 +15,7 @@ from utils.extracted_data import ExtractedData
 from utils.config import Config
 from .pdf_extractor import PDFExtractor
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rag-preprocessor")
 
 
 class PDFProcessor(dl.BaseServiceRunner):
