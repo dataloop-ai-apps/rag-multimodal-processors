@@ -40,16 +40,6 @@ class TextNormalizer:
         return '\n'.join(lines)
 
     @staticmethod
-    def clean_basic(text: str) -> str:
-        """Basic text cleaning: strip lines and normalize whitespace."""
-        if not text:
-            return ""
-        text = text.strip()
-        text = '\n'.join(line.strip() for line in text.split('\n'))
-        text = TextNormalizer.normalize_whitespace(text)
-        return text
-
-    @staticmethod
     def deep_clean(text: str) -> str:
         """
         Aggressive text cleaning using unstructured.io library.

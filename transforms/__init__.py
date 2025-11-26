@@ -8,7 +8,7 @@ from .text_normalization import clean, deep_clean, TextNormalizer
 from .chunking import chunk, chunk_with_images, TextChunker
 from .ocr import ocr_enhance, describe_images, OCREnhancer, ImageDescriber
 from .llm import llm_chunk_semantic, llm_summarize, llm_extract_entities, llm_translate, LLMProcessor
-from .upload import upload_to_dataloop, upload_metadata_only, dry_run_upload, ChunkUploader
+from .upload import upload_to_dataloop, ChunkUploader
 
 __all__ = [
     # Text Normalization
@@ -32,7 +32,5 @@ __all__ = [
     'LLMProcessor',
     # Upload
     'upload_to_dataloop',
-    'upload_metadata_only',
-    'dry_run_upload',
     'ChunkUploader',
 ]

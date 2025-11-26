@@ -60,6 +60,9 @@ class Config:
     # Vision settings
     vision_model_id: Optional[str] = None
 
+    # Upload settings
+    remote_path: str = '/chunks'
+
     def validate(self) -> None:
         """
         Validate configuration values.
@@ -90,6 +93,10 @@ class Config:
         if self.use_ocr and self.ocr_method in ('batch', 'auto') and not self.ocr_model_id:
             errors.append("ocr_model_id is required when ocr_method is 'batch' or 'auto'")
 
+        # Validate LLM settings
+        if (self.generate_summary or self.extract_entities or self.translate) and not self.llm_model_id:
+            errors.append("llm_model_id is required when generate_summary, extract_entities, or translate is enabled")
+
         # Validate error settings
         if self.max_errors <= 0:
             errors.append(f"max_errors must be positive, got {self.max_errors}")
@@ -115,7 +122,7 @@ class Config:
                 'unknown_key': 'ignored'  # Will be ignored
             })
         """
-        valid_keys = {f.name for f in cls.__dataclass_fields__.values()}
+        valid_keys = set(cls.__dataclass_fields__.keys())
         filtered = {k: v for k, v in config_dict.items() if k in valid_keys}
         return cls(**filtered)
 

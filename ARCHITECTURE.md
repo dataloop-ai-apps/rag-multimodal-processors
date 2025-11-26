@@ -128,10 +128,10 @@ class PDFExtractor:
 
 | Module | Functions |
 |--------|-----------|
-| `text_normalization.py` | `clean()`, `normalize_whitespace()`, `remove_empty_lines()` |
+| `text_normalization.py` | `clean()`, `normalize_whitespace()`, `remove_empty_lines()`, `deep_clean()` |
 | `chunking.py` | `chunk()`, `chunk_with_images()`, `TextChunker` |
-| `ocr.py` | `ocr_enhance()`, `describe_images()`, `ocr_batch_enhance()` |
-| `llm.py` | `llm_chunk_semantic()`, `llm_summarize()`, `llm_extract_entities()` |
+| `ocr.py` | `ocr_enhance()`, `describe_images()` |
+| `llm.py` | `llm_chunk_semantic()`, `llm_summarize()`, `llm_extract_entities()`, `llm_translate()` |
 
 **Example Transform:**
 ```python
@@ -203,6 +203,7 @@ class Config:
 
     # OCR
     use_ocr: bool = False
+    ocr_method: Literal['local', 'batch', 'auto'] = 'local'
     ocr_model_id: Optional[str] = None
 
     # Chunking
@@ -210,15 +211,24 @@ class Config:
     max_chunk_size: int = 300
     chunk_overlap: int = 20
 
+    # Cleaning
+    normalize_whitespace: bool = True
+    remove_empty_lines: bool = True
+    use_deep_clean: bool = False
+
+    # LLM
+    llm_model_id: Optional[str] = None
+    generate_summary: bool = False
+    extract_entities: bool = False
+    translate: bool = False
+    target_language: str = 'English'
+
+    # Vision
+    vision_model_id: Optional[str] = None
+
     def validate(self) -> None:
         """Validate configuration consistency."""
-        errors = []
-        if self.max_chunk_size <= 0:
-            errors.append("max_chunk_size must be positive")
-        if self.chunk_overlap >= self.max_chunk_size:
-            errors.append("chunk_overlap must be less than max_chunk_size")
-        if errors:
-            raise ValueError("; ".join(errors))
+        # Validates chunk settings, OCR requirements, LLM requirements, etc.
 ```
 
 ## Error Handling
@@ -310,7 +320,7 @@ from .custom import my_transform
 
 ## Testing
 
-108 unit tests covering all components:
+140 unit tests covering all components:
 
 ```bash
 pytest tests/ -v
@@ -318,11 +328,12 @@ pytest tests/ -v
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
-| `test_utils_config.py` | 16 | Config validation |
-| `test_utils_errors.py` | 20 | Error tracking |
+| `test_utils_config.py` | 22 | Config validation (incl. LLM validation) |
+| `test_utils_errors.py` | 22 | Error tracking |
 | `test_extracted_data.py` | 24 | ExtractedData dataclass |
 | `test_extractors.py` | 16 | PDF/DOC extractors |
 | `test_transforms.py` | 32 | All transforms |
+| Other tests | 24 | Data types, chunk metadata, etc. |
 
 ## Design Principles
 

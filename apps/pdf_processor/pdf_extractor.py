@@ -6,18 +6,15 @@ Handles PDF-specific extraction operations:
 - Image extraction with positional metadata
 - Metadata collection
 """
+
 import logging
 import os
 import tempfile
-from typing import List
+from typing import List, Tuple, Dict, Any
 
-try:
-    import fitz
-    import pymupdf4llm
-    import pymupdf.layout
-except ImportError:
-    fitz = None
-    pymupdf4llm = None
+import fitz
+import pymupdf.layout  # Must be imported before pymupdf4llm for ML layout features
+import pymupdf4llm
 
 from utils.extracted_data import ExtractedData
 from utils.data_types import ImageContent
@@ -37,20 +34,21 @@ class PDFExtractor:
             data.log_error("No item provided for extraction")
             return data
 
-        if fitz is None:
-            data.log_error("Required PDF library not installed. Check logs for details.")
-            logger.error("PyMuPDF (fitz) is required for PDF extraction")
-            return data
-
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 file_path = data.item.download(local_path=temp_dir)
                 use_markdown = data.config.extraction_method == 'markdown'
+                extract_images = data.config.extract_images
 
-                if use_markdown and pymupdf4llm is not None:
-                    PDFExtractor._extract_markdown(data, file_path, temp_dir)
+                if use_markdown:
+                    content, images, metadata = PDFExtractor._extract_markdown(file_path, temp_dir, extract_images)
                 else:
-                    PDFExtractor._extract_pymupdf(data, file_path, temp_dir)
+                    content, images, metadata = PDFExtractor._extract_pymupdf(file_path, temp_dir, extract_images)
+
+                data.content_text = content
+                data.images = images
+                metadata['source_file'] = data.item_name
+                data.metadata = metadata
 
         except Exception as e:
             data.log_error("PDF extraction failed. Check logs for details.")
@@ -59,8 +57,10 @@ class PDFExtractor:
         return data
 
     @staticmethod
-    def _extract_pymupdf(data: ExtractedData, file_path: str, temp_dir: str) -> None:
-        """Extract using basic PyMuPDF."""
+    def _extract_pymupdf(
+        file_path: str, temp_dir: str, extract_images: bool
+    ) -> Tuple[str, List[ImageContent], Dict[str, Any]]:
+        """Extract text and images using basic PyMuPDF."""
         doc = fitz.open(file_path)
         text_parts = []
         images = []
@@ -70,15 +70,12 @@ class PDFExtractor:
                 page_text = page.get_text()
                 text_parts.append(f"\n\n--- Page {page_num + 1} ---\n\n{page_text}")
 
-                if data.config.extract_images:
+                if extract_images:
                     page_images = PDFExtractor._extract_images_from_page(page, page_num, temp_dir)
                     images.extend(page_images)
 
-            data.content_text = ''.join(text_parts)
-            data.images = images
-            data.metadata = {
+            metadata = {
                 'page_count': len(doc),
-                'source_file': data.item_name,
                 'extraction_method': 'pymupdf',
                 'image_count': len(images),
                 'processor': 'pdf',
@@ -86,13 +83,17 @@ class PDFExtractor:
         finally:
             doc.close()
 
+        return ''.join(text_parts), images, metadata
+
     @staticmethod
-    def _extract_markdown(data: ExtractedData, file_path: str, temp_dir: str) -> None:
-        """Extract using pymupdf4llm with ML-based layout enhancement."""
-        data.content_text = pymupdf4llm.to_markdown(file_path)
+    def _extract_markdown(
+        file_path: str, temp_dir: str, extract_images: bool
+    ) -> Tuple[str, List[ImageContent], Dict[str, Any]]:
+        """Extract text and images using pymupdf4llm with ML-based layout."""
+        content = pymupdf4llm.to_markdown(file_path)
         images = []
 
-        if data.config.extract_images:
+        if extract_images:
             doc = fitz.open(file_path)
             try:
                 for page_num, page in enumerate(doc):
@@ -101,9 +102,7 @@ class PDFExtractor:
             finally:
                 doc.close()
 
-        data.images = images
-        data.metadata = {
-            'source_file': data.item_name,
+        metadata = {
             'extraction_method': 'pymupdf4llm',
             'format': 'markdown',
             'layout_enhancement': True,
@@ -111,8 +110,10 @@ class PDFExtractor:
             'processor': 'pdf',
         }
 
+        return content, images, metadata
+
     @staticmethod
-    def _extract_images_from_page(page, page_num: int, temp_dir: str) -> List[ImageContent]:
+    def _extract_images_from_page(page: fitz.Page, page_num: int, temp_dir: str) -> List[ImageContent]:
         """Extract images from a PDF page with positional metadata."""
         images = []
         image_list = page.get_images(full=True)

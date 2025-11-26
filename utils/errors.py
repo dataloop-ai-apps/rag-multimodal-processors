@@ -77,14 +77,6 @@ class ErrorTracker:
         self.warnings.append(warning_msg)
         logger.warning(warning_msg)
 
-    def has_errors(self) -> bool:
-        """Check if any errors have been recorded."""
-        return len(self.errors) > 0
-
-    def has_warnings(self) -> bool:
-        """Check if any warnings have been recorded."""
-        return len(self.warnings) > 0
-
     def get_summary(self) -> str:
         """
         Get a simple summary string for logging.
@@ -93,17 +85,3 @@ class ErrorTracker:
             Summary like "Errors: 2, Warnings: 3"
         """
         return f"Errors: {len(self.errors)}, Warnings: {len(self.warnings)}"
-
-    def get_all_messages(self) -> List[str]:
-        """
-        Get all errors and warnings as a single list.
-
-        Returns:
-            List of all error and warning messages.
-        """
-        return self.errors + self.warnings
-
-    def clear(self) -> None:
-        """Clear all errors and warnings."""
-        self.errors.clear()
-        self.warnings.clear()

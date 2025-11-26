@@ -35,6 +35,8 @@ PDF_CONFIG = {
     # Text Cleaning
     'normalize_whitespace': True,
     'remove_empty_lines': True,
+    # Upload settings
+    'remote_path': '/chunks',  # Remote directory for uploaded chunks
 }
 
 # ============================================================
@@ -53,4 +55,6 @@ DOC_CONFIG = {
     # Text Cleaning
     'normalize_whitespace': True,
     'remove_empty_lines': True,
+    # Upload settings
+    'remote_path': '/chunks',  # Remote directory for uploaded chunks
 }

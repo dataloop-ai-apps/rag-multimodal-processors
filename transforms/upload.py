@@ -157,23 +157,6 @@ class ChunkUploader:
         logger.info(f"Individual upload completed | successful={len(uploaded_items)}/{total_chunks}")
         return uploaded_items
 
-    @staticmethod
-    def upload_metadata(item: dl.Item, metadata: Dict[str, Any]) -> bool:
-        """Upload metadata to an existing Dataloop item."""
-        try:
-            item.metadata['user'] = item.metadata.get('user', {})
-            item.metadata['user'].update(metadata)
-            item.update(system_metadata=True)
-            return True
-        except Exception:
-            return False
-
-    @staticmethod
-    def simulate_upload(chunks: List[str]) -> List[str]:
-        """Simulate upload for dry-run testing."""
-        return [f"simulated_item_{i}" for i in range(len(chunks))]
-
-
 # Transform wrappers
 
 def upload_to_dataloop(data: ExtractedData) -> ExtractedData:
@@ -193,7 +176,7 @@ def upload_to_dataloop(data: ExtractedData) -> ExtractedData:
         chunks=data.chunks,
         source_item=data.item,
         target_dataset=data.target_dataset,
-        remote_path='/chunks',
+        remote_path=data.config.remote_path,
         processor_metadata=data.metadata,
         chunk_metadata_list=data.chunk_metadata if data.chunk_metadata else None,
         image_id_map=data.metadata.get('image_id_map', {}),
@@ -201,34 +184,5 @@ def upload_to_dataloop(data: ExtractedData) -> ExtractedData:
 
     data.uploaded_items = uploaded_items
     data.metadata['uploaded_count'] = len(uploaded_items)
-
-    return data
-
-
-def upload_metadata_only(data: ExtractedData) -> ExtractedData:
-    """Upload only metadata without creating chunk items."""
-    data.current_stage = "metadata_upload"
-
-    if not data.item:
-        data.log_error("Missing source item.")
-        return data
-
-    success = ChunkUploader.upload_metadata(data.item, data.metadata)
-    data.metadata['metadata_uploaded'] = success
-
-    if not success:
-        data.log_warning("Failed to update metadata")
-
-    return data
-
-
-def dry_run_upload(data: ExtractedData) -> ExtractedData:
-    """Simulate upload without actually uploading."""
-    data.current_stage = "dry_run"
-
-    chunks = data.chunks or []
-    data.uploaded_items = ChunkUploader.simulate_upload(chunks)
-    data.metadata['dry_run'] = True
-    data.metadata['uploaded_count'] = len(chunks)
 
     return data

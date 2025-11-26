@@ -19,7 +19,7 @@ class TestPDFExtractorBasics:
 
         result = PDFExtractor.extract(data)
 
-        assert result.errors.has_errors()
+        assert len(result.errors.errors) > 0
         assert "No item provided" in result.errors.errors[0]
 
     def test_extract_sets_current_stage(self):
@@ -29,18 +29,6 @@ class TestPDFExtractorBasics:
         PDFExtractor.extract(data)
 
         assert data.current_stage == "extraction"
-
-    @patch('apps.pdf_processor.pdf_extractor.fitz', None)
-    def test_extract_logs_error_when_fitz_missing(self):
-        """Should log error when PyMuPDF not installed."""
-        mock_item = Mock()
-        mock_item.name = "test.pdf"
-        data = ExtractedData(item=mock_item)
-
-        result = PDFExtractor.extract(data)
-
-        assert result.errors.has_errors()
-        assert "not installed" in result.errors.errors[0]
 
 
 class TestPDFExtractorWithMocks:
@@ -86,7 +74,7 @@ class TestPDFExtractorWithMocks:
 
         assert "Page 1 content" in result.content_text
         assert result.metadata.get('extraction_method') == 'pymupdf'
-        assert not result.errors.has_errors()
+        assert len(result.errors.errors) == 0
 
     def test_extract_populates_metadata(self, mock_fitz, mock_item):
         """Should populate metadata correctly."""
@@ -109,7 +97,7 @@ class TestDOCExtractorBasics:
 
         result = DOCExtractor.extract(data)
 
-        assert result.errors.has_errors()
+        assert len(result.errors.errors) > 0
         assert "No item provided" in result.errors.errors[0]
 
     def test_extract_sets_current_stage(self):
@@ -119,18 +107,6 @@ class TestDOCExtractorBasics:
         DOCExtractor.extract(data)
 
         assert data.current_stage == "extraction"
-
-    @patch('apps.doc_processor.doc_extractor.Document', None)
-    def test_extract_logs_error_when_docx_missing(self):
-        """Should log error when python-docx not installed."""
-        mock_item = Mock()
-        mock_item.name = "test.docx"
-        data = ExtractedData(item=mock_item)
-
-        result = DOCExtractor.extract(data)
-
-        assert result.errors.has_errors()
-        assert "not installed" in result.errors.errors[0]
 
 
 class TestDOCExtractorWithMocks:
@@ -142,12 +118,29 @@ class TestDOCExtractorWithMocks:
         with patch('apps.doc_processor.doc_extractor.Document') as MockDoc:
             mock_doc = MagicMock()
 
+            # Mock paragraph elements
+            mock_element1 = MagicMock()
+            mock_element1.tag = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p'
+            mock_element2 = MagicMock()
+            mock_element2.tag = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p'
+
             # Mock paragraphs
             mock_para1 = MagicMock()
             mock_para1.text = "First paragraph"
+            mock_para1.style.name = "Normal"
+            mock_para1._element = mock_element1
+            mock_para1.runs = []
+
             mock_para2 = MagicMock()
             mock_para2.text = "Second paragraph"
+            mock_para2.style.name = "Normal"
+            mock_para2._element = mock_element2
+            mock_para2.runs = []
+
             mock_doc.paragraphs = [mock_para1, mock_para2]
+
+            # Mock document body iteration
+            mock_doc.element.body = [mock_element1, mock_element2]
 
             # Mock tables (empty)
             mock_doc.tables = []
@@ -183,7 +176,7 @@ class TestDOCExtractorWithMocks:
 
         assert "First paragraph" in result.content_text
         assert "Second paragraph" in result.content_text
-        assert not result.errors.has_errors()
+        assert len(result.errors.errors) == 0
 
     def test_extract_populates_metadata(self, mock_document, mock_item):
         """Should populate metadata correctly."""
@@ -194,7 +187,8 @@ class TestDOCExtractorWithMocks:
 
         assert result.metadata.get('source_file') == 'test.docx'
         assert result.metadata.get('processor') == 'doc'
-        assert result.metadata.get('paragraph_count') == 2
+        assert result.metadata.get('extraction_method') == 'python-docx'
+        assert result.metadata.get('table_count') == 0
 
 
 class TestDOCExtractorTableConversion:
@@ -239,7 +233,7 @@ class TestExtractorIntegration:
 
         PDFExtractor.extract(data)  # Will fail - no item
 
-        assert data.errors.has_errors()
+        assert len(data.errors.errors) > 0
         assert data.current_stage == "extraction"
 
     def test_doc_extractor_error_tracking(self):
@@ -248,7 +242,7 @@ class TestExtractorIntegration:
 
         DOCExtractor.extract(data)  # Will fail - no item
 
-        assert data.errors.has_errors()
+        assert len(data.errors.errors) > 0
         assert data.current_stage == "extraction"
 
     def test_extractor_respects_config(self):

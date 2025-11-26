@@ -11,7 +11,7 @@ import logging
 import re
 import warnings
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple, Optional
 
 from utils.extracted_data import ExtractedData
 from utils.data_types import ImageContent
@@ -24,11 +24,11 @@ _easyocr = None
 
 
 def _get_easyocr():
-    """Lazy import easyocr to avoid loading heavy dependencies until needed."""
+    """Lazy import easyocr to avoid loading torch until needed."""
     global _easyocr
     if _easyocr is None:
-        import easyocr as _easyocr_module
-        _easyocr = _easyocr_module
+        import easyocr
+        _easyocr = easyocr
     return _easyocr
 
 
@@ -42,31 +42,46 @@ class OCREnhancer:
     _easyocr_languages = ['en', 'es', 'fr', 'de', 'it', 'pt']
 
     @staticmethod
-    def extract_local(images: List[ImageContent]) -> Dict[int, List[str]]:
-        """Extract OCR text from images using local EasyOCR."""
+    def extract_local(images: List[ImageContent]) -> Tuple[Dict[int, List[str]], Dict[str, str]]:
+        """
+        Extract OCR text from images using local EasyOCR.
+
+        Returns:
+            Tuple of (ocr_by_page dict, errors dict mapping image_path -> error_message)
+        """
         ocr_by_page: Dict[int, List[str]] = {}
+        ocr_errors: Dict[str, str] = {}
 
         for img in images:
             if img.path:
                 try:
-                    ocr_text = OCREnhancer._extract_with_easyocr(img.path)
-                    if ocr_text:
+                    ocr_text, error_msg = OCREnhancer._extract_with_easyocr(img.path)
+                    if error_msg:
+                        ocr_errors[img.path] = error_msg
+                    elif ocr_text:
                         page_num = img.page_number or 0
                         if page_num not in ocr_by_page:
                             ocr_by_page[page_num] = []
                         ocr_by_page[page_num].append(ocr_text)
                 except Exception as e:
-                    logger.warning(f"OCR failed for {img.path}: {e}")
+                    error_message = f"OCR failed for {img.path}: {e}"
+                    logger.warning(error_message)
+                    ocr_errors[img.path] = str(e)
 
-        return ocr_by_page
+        return ocr_by_page, ocr_errors
 
     @staticmethod
-    def extract_batch(images: List[ImageContent], model_id: str, dataset, item_name: str, item_id: str) -> Dict[int, List[str]]:
+    def extract_batch(
+        images: List[ImageContent], model_id: str, dataset, item_name: str, item_id: str
+    ) -> Tuple[Dict[int, List[str]], Dict[str, str]]:
         """
         Extract OCR text from images using Dataloop batch processing.
 
         TODO: Implement Dataloop model integration.
         Currently falls back to local OCR.
+
+        Returns:
+            Tuple of (ocr_by_page dict, errors dict mapping image_path -> error_message)
         """
         logger.warning("Batch OCR with Dataloop models not yet implemented. Using local OCR.")
         return OCREnhancer.extract_local(images)
@@ -114,11 +129,17 @@ class OCREnhancer:
         return ''.join(result_parts)
 
     @staticmethod
-    def _extract_with_easyocr(image_path: str) -> str:
-        """Extract text using EasyOCR."""
+    def _extract_with_easyocr(image_path: str) -> Tuple[str, Optional[str]]:
+        """
+        Extract text using EasyOCR.
+
+        Returns:
+            Tuple of (extracted_text, error_message)
+            - If successful: (text, None)
+            - If failed: ("", error_message_string)
+        """
         try:
             easyocr = _get_easyocr()
-
             if OCREnhancer._easyocr_reader is None:
                 logger.info(f"Initializing EasyOCR reader with languages: {OCREnhancer._easyocr_languages}")
                 OCREnhancer._easyocr_reader = easyocr.Reader(OCREnhancer._easyocr_languages, gpu=False)
@@ -129,15 +150,20 @@ class OCREnhancer:
             all_text = ' '.join([text for (bbox, text, confidence) in results])
 
             logger.info(f"EasyOCR extracted {len(results)} text blocks, total length: {len(all_text)}")
-            return all_text
+            return all_text, None
 
         except Exception as e:
-            logger.error(f"EasyOCR failed: {str(e)}")
-            return f"[OCR_ERROR: {str(e)}]"
+            error_message = f"EasyOCR failed: {str(e)}"
+            logger.error(error_message)
+            return "", error_message
 
 
 class ImageDescriber:
-    """Image description using vision models. Dataloop model integration pending."""
+    """
+    Image description using vision models.
+    
+    TODO: Implement Dataloop model integration.
+    """
 
     @staticmethod
     def describe(images: List[ImageContent], model_id: str, dataset, item_name: str, item_id: str) -> List[str]:
@@ -151,6 +177,7 @@ class ImageDescriber:
 
 
 # Transform wrappers
+
 
 def ocr_enhance(data: ExtractedData) -> ExtractedData:
     """
@@ -170,7 +197,15 @@ def ocr_enhance(data: ExtractedData) -> ExtractedData:
     if data.config.ocr_method in ('batch', 'auto'):
         logger.info(f"OCR method '{data.config.ocr_method}' requested but batch not implemented. Using local OCR.")
 
-    ocr_by_page = OCREnhancer.extract_local(data.images)
+    ocr_by_page, ocr_errors = OCREnhancer.extract_local(data.images)
+
+    # Store OCR errors in metadata
+    if ocr_errors:
+        data.metadata['ocr_errors'] = ocr_errors
+        data.metadata['ocr_failed_count'] = len(ocr_errors)
+        # Log warnings for each failed OCR attempt
+        for image_path, error_msg in ocr_errors.items():
+            data.log_warning(f"EasyOCR failed for {image_path}: {error_msg}")
 
     if not ocr_by_page:
         return data
@@ -205,7 +240,7 @@ def describe_images(data: ExtractedData) -> ExtractedData:
         return data
 
     # Placeholder - not yet implemented
-    logger.warning("Image captioning with Dataloop models not yet implemented. Skipping image descriptions.")
+    data.log_warning("Image captioning with Dataloop models not yet implemented. Skipping.")
     data.metadata['image_descriptions_generated'] = False
 
     return data
