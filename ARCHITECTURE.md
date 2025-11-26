@@ -132,6 +132,7 @@ class PDFExtractor:
 | `chunking.py` | `chunk()`, `chunk_with_images()`, `TextChunker` |
 | `ocr.py` | `ocr_enhance()`, `describe_images()` |
 | `llm.py` | `llm_chunk_semantic()`, `llm_summarize()`, `llm_extract_entities()`, `llm_translate()` |
+| `upload.py` | `upload_to_dataloop()`, `ChunkUploader` |
 
 **Example Transform:**
 ```python
@@ -164,9 +165,8 @@ def clean(data: ExtractedData) -> ExtractedData:
 | `config.py` | `Config` dataclass with validation |
 | `errors.py` | `ErrorTracker` for error/warning tracking |
 | `data_types.py` | `ImageContent`, `TableContent` data models |
-| `upload.py` | `upload_to_dataloop()` upload transform |
-| `dataloop_helpers.py` | Dataloop integration helpers |
 | `chunk_metadata.py` | `ChunkMetadata` dataclass |
+| `dataloop_helpers.py` | Dataloop integration helpers |
 
 ### 5. Main API (`main.py`)
 
@@ -225,6 +225,9 @@ class Config:
 
     # Vision
     vision_model_id: Optional[str] = None
+
+    # Upload
+    remote_path: str = '/chunks'
 
     def validate(self) -> None:
         """Validate configuration consistency."""
@@ -320,20 +323,20 @@ from .custom import my_transform
 
 ## Testing
 
-140 unit tests covering all components:
-
 ```bash
-pytest tests/ -v
+# Unit tests
+pytest tests/test_core.py tests/test_extractors.py tests/test_transforms.py -v
+
+# Integration tests (requires Dataloop auth)
+pytest tests/test_processors.py -v
 ```
 
-| Test File | Tests | Coverage |
-|-----------|-------|----------|
-| `test_utils_config.py` | 22 | Config validation (incl. LLM validation) |
-| `test_utils_errors.py` | 22 | Error tracking |
-| `test_extracted_data.py` | 24 | ExtractedData dataclass |
-| `test_extractors.py` | 16 | PDF/DOC extractors |
-| `test_transforms.py` | 32 | All transforms |
-| Other tests | 24 | Data types, chunk metadata, etc. |
+| Test File | Coverage |
+|-----------|----------|
+| `test_core.py` | Config, ErrorTracker, ExtractedData, ChunkMetadata |
+| `test_extractors.py` | PDFExtractor, DOCExtractor |
+| `test_transforms.py` | All transform functions |
+| `test_processors.py` | Integration tests (PDF, DOC) |
 
 ## Design Principles
 

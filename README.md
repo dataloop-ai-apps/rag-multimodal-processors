@@ -17,7 +17,7 @@ Modular, extensible processors for converting **PDF and DOC files** into RAG-rea
 - **Flexible OCR** - Local EasyOCR or Dataloop batch models
 - **Multiple Chunking Strategies** - Recursive, semantic, sentence, fixed
 - **Error Handling** - Configurable error modes ('stop' or 'continue')
-- **140 Unit Tests** - Comprehensive test coverage
+- **Comprehensive Tests** - Unit and integration test coverage
 
 ## Quick Start
 
@@ -132,6 +132,9 @@ chunks = PDFProcessor.run(item, dataset, {
 
     # Vision options
     'vision_model_id': 'model-id',      # Model for image descriptions
+
+    # Upload options
+    'remote_path': '/chunks',           # Remote directory for chunks
 })
 ```
 
@@ -156,6 +159,7 @@ chunks = PDFProcessor.run(item, dataset, {
 | `translate` | bool | False | Translate content |
 | `target_language` | str | 'English' | Target language for translation |
 | `vision_model_id` | str | None | Dataloop model ID for image descriptions |
+| `remote_path` | str | '/chunks' | Remote directory for uploaded chunks |
 
 ## Architecture
 
@@ -180,14 +184,15 @@ transforms/                 # Pipeline transforms: (ExtractedData) -> ExtractedD
 ├── text_normalization.py  # clean(), normalize_whitespace(), deep_clean()
 ├── chunking.py            # chunk(), chunk_with_images(), TextChunker
 ├── ocr.py                 # ocr_enhance(), describe_images()
-└── llm.py                 # llm_chunk_semantic(), llm_summarize(), llm_translate()
+├── llm.py                 # llm_chunk_semantic(), llm_summarize(), llm_translate()
+└── upload.py              # upload_to_dataloop()
 
 utils/                      # Core utilities and data models
 ├── extracted_data.py      # ExtractedData dataclass
 ├── config.py              # Config dataclass with validation
 ├── errors.py              # ErrorTracker for error handling
 ├── data_types.py          # ImageContent, TableContent
-└── upload.py              # upload_to_dataloop()
+└── chunk_metadata.py      # ChunkMetadata dataclass
 ```
 
 ### Key Design: ExtractedData
@@ -234,25 +239,23 @@ data = transforms.upload_to_dataloop(data)
 
 ## Testing
 
-140 unit tests covering all components:
-
 ```bash
-# Run all tests
-pytest tests/ -v
+# Run unit tests
+pytest tests/test_core.py tests/test_extractors.py tests/test_transforms.py -v
 
-# Run specific test files
-pytest tests/test_transforms.py -v
-pytest tests/test_extracted_data.py -v
-pytest tests/test_utils_config.py -v
+# Run integration tests (requires Dataloop auth)
+pytest tests/test_processors.py -v
+
+# Run specific processor
+pytest tests/test_processors.py -k pdf -v
+pytest tests/test_processors.py -k doc -v
 ```
 
-Test breakdown:
-- 22 config tests (including LLM validation)
-- 22 error tracker tests
-- 24 extracted data tests
-- 16 extractor tests
-- 32 transform tests
-- 24 other tests (data types, chunk metadata, etc.)
+Test files:
+- `test_core.py` - Config, ErrorTracker, ExtractedData, ChunkMetadata
+- `test_extractors.py` - PDFExtractor, DOCExtractor
+- `test_transforms.py` - Transform functions
+- `test_processors.py` - Integration tests (PDF, DOC)
 
 ## Adding New File Types
 
