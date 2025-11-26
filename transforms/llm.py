@@ -1,16 +1,14 @@
 """
-LLM-based processing transforms using Dataloop models.
+LLM-based processing transforms.
 
 All functions follow signature: (data: ExtractedData) -> ExtractedData
+
+NOTE: Dataloop model integration is not yet implemented.
+These functions are placeholders for future implementation.
 """
 
-import json
 import logging
-import os
-import tempfile
 from typing import Optional, List, Dict, Any
-
-import dtlpy as dl
 
 from utils.extracted_data import ExtractedData
 
@@ -18,154 +16,66 @@ logger = logging.getLogger("rag-preprocessor")
 
 
 class LLMProcessor:
-    """LLM-based text processing operations via Dataloop models."""
+    """LLM-based text processing operations. Dataloop model integration pending."""
 
     @staticmethod
-    def call_model(
-        model_id: str,
-        prompt: str,
-        dataset: Optional[dl.Dataset] = None
-    ) -> Optional[str]:
+    def call_model(model_id: str, prompt: str, dataset=None) -> Optional[str]:
         """
-        Call Dataloop LLM model with a text prompt.
+        Call LLM model with a text prompt.
 
-        Creates a temporary text item, runs prediction, and retrieves result.
+        TODO: Implement Dataloop model integration.
         """
-        result = None
-        temp_item = None
-        temp_path = None
-
-        try:
-            model = dl.models.get(model_id=model_id)
-
-            if dataset is None:
-                project = model.project
-                datasets = project.datasets.list()
-                if datasets.items:
-                    dataset = datasets.items[0]
-                else:
-                    return None
-
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-                f.write(prompt)
-                temp_path = f.name
-
-            temp_item = dataset.items.upload(local_path=temp_path, remote_path='/temp', overwrite=True)
-
-            execution = model.predict(item_ids=[temp_item.id])
-            execution.wait()
-
-            if execution.latest_status['status'] == dl.ExecutionStatus.SUCCESS:
-                updated_item = dl.items.get(item_id=temp_item.id)
-
-                annotations = updated_item.annotations.list()
-                if annotations.items:
-                    for ann in annotations.items:
-                        if hasattr(ann, 'label') and ann.label == 'response':
-                            result = ann.metadata.get('text', '')
-                            break
-                        elif hasattr(ann, 'metadata') and 'text' in ann.metadata:
-                            result = ann.metadata['text']
-                            break
-
-                if not result:
-                    result = updated_item.metadata.get('llm_response', '')
-
-                if not result and hasattr(execution, 'output') and execution.output:
-                    result = str(execution.output)
-
-            if temp_item:
-                try:
-                    temp_item.delete()
-                except Exception:
-                    pass
-
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.unlink(temp_path)
-                except Exception:
-                    pass
-
-        except Exception:
-            if temp_item:
-                try:
-                    temp_item.delete()
-                except Exception:
-                    pass
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.unlink(temp_path)
-                except Exception:
-                    pass
-
-        return result
-
-    @staticmethod
-    def chunk_semantic(
-        text: str,
-        model_id: str,
-        dataset: Optional[dl.Dataset] = None
-    ) -> List[str]:
-        """Perform semantic chunking using an LLM."""
-        # Placeholder for semantic chunking implementation
-        return []
-
-    @staticmethod
-    def summarize(
-        text: str,
-        model_id: str,
-        max_chars: int = 2000,
-        dataset: Optional[dl.Dataset] = None
-    ) -> Optional[str]:
-        """Generate summary of text using an LLM."""
-        prompt = f"Provide a concise summary of the following text in 2-3 sentences:\n\n{text[:max_chars]}"
-        return LLMProcessor.call_model(model_id, prompt, dataset)
-
-    @staticmethod
-    def extract_entities(
-        text: str,
-        model_id: str,
-        max_chars: int = 1000,
-        dataset: Optional[dl.Dataset] = None
-    ) -> Optional[Dict[str, Any]]:
-        """Extract named entities from text using an LLM."""
-        prompt = f"""Extract key entities (people, organizations, locations, dates) from this text.
-Return as JSON list.
-
-Text:
-{text[:max_chars]}"""
-
-        response = LLMProcessor.call_model(model_id, prompt, dataset)
-
-        if response:
-            try:
-                return json.loads(response)
-            except (json.JSONDecodeError, ValueError):
-                return {'raw': response}
+        logger.warning("LLM model integration not yet implemented")
         return None
 
     @staticmethod
-    def translate(
-        text: str,
-        model_id: str,
-        target_language: str,
-        dataset: Optional[dl.Dataset] = None
-    ) -> Optional[str]:
-        """Translate text using an LLM."""
-        prompt = f"""Translate the following text to {target_language}:
+    def chunk_semantic(text: str, model_id: str, dataset=None) -> List[str]:
+        """
+        Perform semantic chunking using an LLM.
 
-{text}"""
+        TODO: Implement Dataloop model integration.
+        """
+        logger.warning("Semantic chunking not yet implemented")
+        return []
 
-        return LLMProcessor.call_model(model_id, prompt, dataset)
+    @staticmethod
+    def summarize(text: str, model_id: str, max_chars: int = 2000, dataset=None) -> Optional[str]:
+        """
+        Generate summary of text using an LLM.
+
+        TODO: Implement Dataloop model integration.
+        """
+        logger.warning("LLM summarization not yet implemented")
+        return None
+
+    @staticmethod
+    def extract_entities(text: str, model_id: str, max_chars: int = 1000, dataset=None) -> Optional[Dict[str, Any]]:
+        """
+        Extract named entities from text using an LLM.
+
+        TODO: Implement Dataloop model integration.
+        """
+        logger.warning("Entity extraction not yet implemented")
+        return None
+
+    @staticmethod
+    def translate(text: str, model_id: str, target_language: str, dataset=None) -> Optional[str]:
+        """
+        Translate text using an LLM.
+
+        TODO: Implement Dataloop model integration.
+        """
+        logger.warning("LLM translation not yet implemented")
+        return None
 
 
 # Transform wrappers
 
 def llm_chunk_semantic(data: ExtractedData) -> ExtractedData:
-    """Semantic chunking using a LLM."""
+    """Semantic chunking using an LLM. Not yet implemented."""
     data.current_stage = "llm_chunking"
     content = data.get_text()
-    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
+    model_id = getattr(data.config, 'llm_model_id', None)
 
     if not content:
         data.chunks = []
@@ -176,99 +86,71 @@ def llm_chunk_semantic(data: ExtractedData) -> ExtractedData:
         data.chunks = []
         return data
 
-    data.chunks = LLMProcessor.chunk_semantic(
-        text=content,
-        model_id=model_id,
-        dataset=data.target_dataset
-    )
+    # Placeholder - returns empty list until implemented
+    data.chunks = LLMProcessor.chunk_semantic(text=content, model_id=model_id, dataset=data.target_dataset)
     data.metadata['chunking_method'] = 'llm_semantic'
 
     return data
 
 
 def llm_summarize(data: ExtractedData) -> ExtractedData:
-    """Generate summary of content using Dataloop LLM."""
+    """Generate summary of content. Not yet implemented."""
     data.current_stage = "summarization"
     content = data.get_text()
-    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
+    model_id = getattr(data.config, 'llm_model_id', None)
     generate_summary = getattr(data.config, 'generate_summary', False)
 
     if not content or not generate_summary or not model_id:
         return data
 
-    try:
-        response = LLMProcessor.summarize(
-            text=content,
-            model_id=model_id,
-            max_chars=2000,
-            dataset=data.target_dataset
-        )
+    response = LLMProcessor.summarize(text=content, model_id=model_id, max_chars=2000, dataset=data.target_dataset)
 
-        if response:
-            data.metadata['summary'] = response.strip()
-    except Exception as e:
-        data.log_warning("Summary generation failed. Check logs for details.")
-        logger.exception(f"Summary generation error: {e}")
+    if response:
+        data.metadata['summary'] = response.strip()
 
     return data
 
 
 def llm_extract_entities(data: ExtractedData) -> ExtractedData:
-    """Extract named entities using Dataloop LLM."""
+    """Extract named entities. Not yet implemented."""
     data.current_stage = "entity_extraction"
     content = data.get_text()
-    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
-    extract_entities = getattr(data.config, 'extract_entities', False)
+    model_id = getattr(data.config, 'llm_model_id', None)
+    extract_entities_flag = getattr(data.config, 'extract_entities', False)
 
-    if not content or not extract_entities or not model_id:
+    if not content or not extract_entities_flag or not model_id:
         return data
 
-    try:
-        entities = LLMProcessor.extract_entities(
-            text=content,
-            model_id=model_id,
-            max_chars=1000,
-            dataset=data.target_dataset
-        )
+    entities = LLMProcessor.extract_entities(text=content, model_id=model_id, max_chars=1000, dataset=data.target_dataset)
 
-        if entities:
-            if 'raw' in entities:
-                data.metadata['entities_raw'] = entities['raw']
-            else:
-                data.metadata['entities'] = entities
-    except Exception as e:
-        data.log_warning("Entity extraction failed. Check logs for details.")
-        logger.exception(f"Entity extraction error: {e}")
+    if entities:
+        if 'raw' in entities:
+            data.metadata['entities_raw'] = entities['raw']
+        else:
+            data.metadata['entities'] = entities
 
     return data
 
 
 def llm_translate(data: ExtractedData) -> ExtractedData:
-    """Translate content using Dataloop LLM."""
+    """Translate content. Not yet implemented."""
     data.current_stage = "translation"
     content = data.get_text()
-    model_id = data.config.llm_model_id if hasattr(data.config, 'llm_model_id') else None
+    model_id = getattr(data.config, 'llm_model_id', None)
     target_lang = getattr(data.config, 'target_language', 'English')
-    translate = getattr(data.config, 'translate', False)
+    translate_flag = getattr(data.config, 'translate', False)
 
-    if not content or not translate or not model_id:
+    if not content or not translate_flag or not model_id:
         return data
 
-    try:
-        response = LLMProcessor.translate(
-            text=content,
-            model_id=model_id,
-            target_language=target_lang,
-            dataset=data.target_dataset
-        )
+    response = LLMProcessor.translate(
+        text=content, model_id=model_id, target_language=target_lang, dataset=data.target_dataset
+    )
 
-        if response:
-            data.metadata['original_content'] = content
-            data.metadata['original_language'] = 'auto-detected'
-            data.metadata['target_language'] = target_lang
-            data.content_text = response.strip()
-    except Exception as e:
-        data.log_warning("Translation failed. Check logs for details.")
-        logger.exception(f"Translation error: {e}")
+    if response:
+        data.metadata['original_content'] = content
+        data.metadata['original_language'] = 'auto-detected'
+        data.metadata['target_language'] = target_lang
+        data.content_text = response.strip()
 
     return data
