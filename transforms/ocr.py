@@ -1,10 +1,6 @@
 """
 OCR enhancement transforms.
 
-Public API:
-- ocr_enhance(): Single entry point for OCR text extraction (local EasyOCR only)
-- describe_images(): Generate image captions (not yet implemented)
-
 All functions follow signature: (data: ExtractedData) -> ExtractedData
 
 NOTE: Dataloop model integration for batch OCR and image captioning is not yet implemented.
@@ -63,11 +59,6 @@ class OCREnhancer:
                     logger.warning(f"OCR failed for {img.path}: {e}")
 
         return ocr_by_page
-
-    @staticmethod
-    def extract_text_from_path(image_path: str) -> str:
-        """Extract text from local image file path using EasyOCR."""
-        return OCREnhancer._extract_with_easyocr(image_path)
 
     @staticmethod
     def extract_batch(images: List[ImageContent], model_id: str, dataset, item_name: str, item_id: str) -> Dict[int, List[str]]:
@@ -146,7 +137,7 @@ class OCREnhancer:
 
 
 class ImageDescriber:
-    """Image description operations. Dataloop model integration pending."""
+    """Image description using vision models. Dataloop model integration pending."""
 
     @staticmethod
     def describe(images: List[ImageContent], model_id: str, dataset, item_name: str, item_id: str) -> List[str]:
@@ -155,7 +146,7 @@ class ImageDescriber:
 
         TODO: Implement Dataloop model integration.
         """
-        logger.warning("Image captioning with Dataloop models not yet implemented")
+        logger.warning("Image captioning not yet implemented")
         return []
 
 
@@ -176,11 +167,8 @@ def ocr_enhance(data: ExtractedData) -> ExtractedData:
     if not data.images:
         return data
 
-    ocr_method = getattr(data.config, 'ocr_method', 'local')
-
-    # All methods currently use local OCR
-    if ocr_method in ('batch', 'auto'):
-        logger.info(f"OCR method '{ocr_method}' requested but Dataloop models not implemented. Using local OCR.")
+    if data.config.ocr_method in ('batch', 'auto'):
+        logger.info(f"OCR method '{data.config.ocr_method}' requested but batch not implemented. Using local OCR.")
 
     ocr_by_page = OCREnhancer.extract_local(data.images)
 
@@ -212,13 +200,12 @@ def describe_images(data: ExtractedData) -> ExtractedData:
     if not data.images:
         return data
 
-    model_id = getattr(data.config, 'vision_model_id', None)
-    if not model_id:
+    if not data.config.vision_model_id:
         data.log_warning("Vision model not configured. Skipping image descriptions.")
         return data
 
     # Placeholder - not yet implemented
-    logger.warning("Image captioning with Dataloop models not yet implemented")
+    logger.warning("Image captioning with Dataloop models not yet implemented. Skipping image descriptions.")
     data.metadata['image_descriptions_generated'] = False
 
     return data

@@ -4,7 +4,7 @@ Simple configuration with validation.
 This module provides a flat, easy-to-understand configuration class.
 All settings are in one place with straightforward validation.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional, Literal, List
 
 
@@ -49,6 +49,16 @@ class Config:
     normalize_whitespace: bool = True
     remove_empty_lines: bool = True
     use_deep_clean: bool = False
+
+    # LLM settings
+    llm_model_id: Optional[str] = None
+    generate_summary: bool = False
+    extract_entities: bool = False
+    translate: bool = False
+    target_language: str = 'English'
+
+    # Vision settings
+    vision_model_id: Optional[str] = None
 
     def validate(self) -> None:
         """
@@ -110,25 +120,5 @@ class Config:
         return cls(**filtered)
 
     def to_dict(self) -> dict:
-        """
-        Convert Config to dictionary.
-
-        Returns:
-            Dictionary with all configuration values.
-        """
-        return {
-            'error_mode': self.error_mode,
-            'max_errors': self.max_errors,
-            'extraction_method': self.extraction_method,
-            'extract_images': self.extract_images,
-            'extract_tables': self.extract_tables,
-            'use_ocr': self.use_ocr,
-            'ocr_method': self.ocr_method,
-            'ocr_model_id': self.ocr_model_id,
-            'chunking_strategy': self.chunking_strategy,
-            'max_chunk_size': self.max_chunk_size,
-            'chunk_overlap': self.chunk_overlap,
-            'normalize_whitespace': self.normalize_whitespace,
-            'remove_empty_lines': self.remove_empty_lines,
-            'use_deep_clean': self.use_deep_clean,
-        }
+        """Convert Config to dictionary."""
+        return asdict(self)

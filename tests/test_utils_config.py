@@ -200,7 +200,9 @@ class TestConfigToDict:
             'error_mode', 'max_errors', 'extraction_method',
             'extract_images', 'extract_tables', 'use_ocr', 'ocr_method', 'ocr_model_id',
             'chunking_strategy', 'max_chunk_size', 'chunk_overlap',
-            'normalize_whitespace', 'remove_empty_lines', 'use_deep_clean'
+            'normalize_whitespace', 'remove_empty_lines', 'use_deep_clean',
+            'llm_model_id', 'generate_summary', 'extract_entities', 'translate', 'target_language',
+            'vision_model_id'
         }
 
         assert set(config_dict.keys()) == expected_keys
