@@ -1,20 +1,28 @@
 # PDF Processor
 
-A Dataloop application that extracts text from PDF documents, applies OCR to images, and creates chunks for Retrieval-Augmented Generation (RAG) workflows.
+A modular Dataloop application for processing PDF files into RAG-ready chunks with ML-enhanced extraction and flexible OCR.
 
 ## 🎯 Features
 
 ### Text Extraction
-- **Plain Text**: Fast extraction using PyMuPDF (fitz)
-- **Markdown-Aware**: Preserves document structure (headers, lists, tables) using `pymupdf4llm`
+- **Plain Text**: Standard extraction using PyMuPDF (fitz)
+- **ML-Enhanced Markdown**: PyMuPDF Layout for improved structure preservation
+  - ML-based layout analysis
+  - Intelligent OCR evaluation (uses Tesseract when beneficial)
+  - Better header/footer detection
+  - Improved multi-column and table handling
+
+### Chunk Upload
+- **Bulk Upload**: Upload all chunks in a single operation using pandas DataFrame
+- **Per-Chunk Metadata**: Track page numbers, images, extraction method per chunk
+- **Resilient Fallback**: Automatic retry with individual uploads if needed
 
 ### OCR from Images
 Extract embedded images and apply OCR to extract text:
 
-- ✅ Local processing, no upload required
-- ✅ Processes images as temporary files
-- ✅ No Dataloop items created
-- ✅ Fast and efficient text extraction
+- **Flexible OCR Backends**: Dataloop models, EasyOCR fallback, or Tesseract via PyMuPDF Layout
+- **Local Processing**: Images processed as temporary files without creating Dataloop items
+- **Multiple Integration Methods**: Choose how OCR text integrates with document text
 
 **OCR Integration Methods**
 - `append_to_page`: Attaches OCR text to corresponding page (maintains structure)
@@ -50,7 +58,7 @@ All parameters are configured via the pipeline node in Dataloop.
 | `chunking_strategy` | string | `"recursive"` | `"recursive"`, `"fixed-size"`, `"nltk-sentence"`, `"nltk-paragraphs"`, or `"1-chunk"` | Determines how the extracted text is split into chunks. `recursive`: Intelligently splits text respecting semantic boundaries (recommended for most use cases). `fixed-size`: Creates uniform chunks of equal size with overlap. `nltk-sentence`: Splits by sentences using NLTK. `nltk-paragraphs`: Splits by paragraphs using NLTK. `1-chunk`: No splitting, entire document as one chunk (useful for short documents). |
 | `max_chunk_size` | integer | `300` | `1` to `2000` characters | Maximum size of each text chunk in characters. Smaller chunks provide more granular retrieval but may lose context. Larger chunks maintain more context but may be less precise. Recommended range: 300-500 for most RAG applications. This parameter works with `chunk_overlap` to control chunk boundaries. |
 | `chunk_overlap` | integer | `20` | `0` to `400` characters | Number of characters that overlap between consecutive chunks. Overlap helps maintain context across chunk boundaries and prevents information loss at split points. Should be 10-20% of `max_chunk_size`. Set to 0 for no overlap. Higher values improve context preservation but increase storage requirements. |
-| `to_correct_spelling` | boolean | `false` | `true` or `false` | When enabled, applies text cleaning and normalization using the `unstructured.io` library. This includes: unicode quote replacement, non-ASCII character handling, punctuation normalization, and whitespace normalization. Enable for documents with OCR errors or inconsistent formatting. May slow down processing. |
+| `correct_spelling` | boolean | `false` | `true` or `false` | When enabled, applies text cleaning and normalization using the `unstructured.io` library. This includes: unicode quote replacement, non-ASCII character handling, punctuation normalization, and whitespace normalization. Enable for documents with OCR errors or inconsistent formatting. May slow down processing. |
 
 ### OCR Configuration
 
@@ -99,7 +107,7 @@ OCR processing uses **EasyOCR** for local, efficient text extraction from images
   "chunking_strategy": "recursive",
   "max_chunk_size": 500,
   "chunk_overlap": 50,
-  "to_correct_spelling": false
+  "correct_spelling": false
 }
 ```
 
@@ -126,18 +134,51 @@ Each chunk includes comprehensive metadata for provenance tracking:
 ```json
 {
   "user": {
-    "document": "example.pdf",
-    "document_type": "application/pdf",
-    "total_pages": 25,
+    "source_item_id": "65f2a3b4c1e2d3f4a5b6c7d8",
+    "source_file": "example.pdf",
+    "source_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
+    "chunk_index": 0,
     "total_chunks": 120,
-    "extraction_method": "pymupdf4llm",
-    "extraction_format": "markdown",
-    "chunking_strategy": "recursive",
-    "markdown_aware_splitting": true,
     "extracted_chunk": true,
-    "original_item_id": "65f2a3b4c1e2d3f4a5b6c7d8",
-    "original_dataset_id": "65f2a3b4c1e2d3f4a5b6c7d9",
-    "processing_timestamp": 1698765432.123
+    "processing_timestamp": 1698765432.123,
+    "processor": "pdf",
+    "extraction_method": "pymupdf4llm_layout",
+    "layout_enhancement": true,
+    "page_numbers": [1, 2],
+    "image_ids": ["img_id_1", "img_id_2"]
   }
 }
+```
+
+**Key Metadata Fields:**
+- `extraction_method`: `"pymupdf4llm_layout"` (ML-enhanced) or `"pymupdf4llm"` (standard) or `"pymupdf"` (plain text)
+- `layout_enhancement`: `true` if PyMuPDF Layout was active during extraction
+- `page_numbers`: List of source pages for this chunk
+- `image_ids`: IDs of associated images (if any)
+- `chunk_index` / `total_chunks`: Position in document for reconstruction
+
+## 🏗️ Architecture
+
+The PDF processor uses a type-safe, stateless architecture:
+
+```
+PDFProcessor (app.py)
+    ├── PDFExtractor (pdf_extractor.py) - PDF-specific extraction
+    └── Transforms - Shared pipeline operations
+        ├── transforms.clean() - Text normalization
+        ├── transforms.chunk() - Text chunking
+        └── transforms.upload_to_dataloop() - Chunk upload
+```
+
+**Key Components:**
+- `ExtractedData` dataclass flows through the entire pipeline
+- `Config` dataclass handles validated configuration
+- All methods are static for concurrent processing support
+
+**Pipeline Flow:**
+```python
+data = PDFExtractor.extract(data)    # Extract text, images, tables
+data = transforms.clean(data)         # Normalize text
+data = transforms.chunk(data)         # Split into chunks
+data = transforms.upload_to_dataloop(data)  # Upload chunks
 ```

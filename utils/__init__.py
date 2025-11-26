@@ -1,23 +1,25 @@
 """
-Utilities package for shared functionality.
-Common helpers used across processors, chunkers, and extractors.
+Utils infrastructure package for shared functionality.
+
+Public API:
+- ExtractedData: Central pipeline data structure
+- Config: Configuration with validation
+- ErrorTracker: Error tracking utilities
+- ImageContent, TableContent: Data types for content extraction
+- ChunkMetadata: Metadata structure for chunks
 """
 
-from .text_cleaning import clean_text
-from .dataloop_helpers import (
-    get_or_create_target_dataset,
-    upload_chunks,
-    cleanup_temp_items_and_folder
-)
-from .dataloop_model_executor import DataloopModelExecutor
+from .config import Config
+from .errors import ErrorTracker
+from .extracted_data import ExtractedData
+from .data_types import ImageContent, TableContent
 from .chunk_metadata import ChunkMetadata
 
 __all__ = [
-    'clean_text',
-    'get_or_create_target_dataset', 
-    'upload_chunks',
-    'cleanup_temp_items_and_folder',
-    'DataloopModelExecutor',
-    'ChunkMetadata'
+    'ExtractedData',
+    'Config',
+    'ErrorTracker',
+    'ImageContent',
+    'TableContent',
+    'ChunkMetadata',
 ]
-

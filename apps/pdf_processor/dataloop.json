@@ -41,9 +41,9 @@
       {
         "invoke": {
           "type": "function",
-          "namespace": "pdf-processor-service.pdf-processor-module.process_document"
+          "namespace": "pdf-processor-service.pdf-processor-module.run"
         },
-        "name": "process_document",
+        "name": "run",
         "categories": [
           "document-processing"
         ],
@@ -201,7 +201,7 @@
               "widget": "dl-slider"
             },
             {
-              "name": "to_correct_spelling",
+              "name": "correct_spelling",
               "title": "Apply Text Cleaning",
               "props": {
                 "type": "boolean",
@@ -219,12 +219,12 @@
       {
         "name": "pdf-processor-module",
         "computeConfig": "pdf-processor-service",
-        "entryPoint": "apps/pdf-processor/pdf_processor.py",
+        "entryPoint": "apps/pdf_processor/app.py",
         "className": "PDFProcessor",
         "initInputs": [],
         "functions": [
           {
-            "name": "process_document",
+            "name": "run",
             "input": [
               {
                 "type": "Item",
