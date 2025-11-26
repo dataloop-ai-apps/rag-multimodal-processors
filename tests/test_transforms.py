@@ -23,7 +23,7 @@ class TestCleanTransform:
         assert result.cleaned_text == "Hello World"
 
     def test_clean_normalizes_newlines(self):
-        data = ExtractedData(config=Config())
+        data = ExtractedData(config=Config(remove_empty_lines=False))
         data.content_text = "Hello\n\n\n\nWorld"
         result = transforms.clean(data)
         assert result.cleaned_text == "Hello\n\nWorld"
@@ -46,32 +46,57 @@ class TestCleanTransform:
         result = transforms.clean(data)
         assert result.cleaned_text == ""
 
-
-class TestNormalizeWhitespaceTransform:
-    """Tests for whitespace normalization transform."""
-
-    def test_normalize_whitespace_basic(self):
-        data = ExtractedData(config=Config())
+    def test_clean_respects_normalize_whitespace_config(self):
+        """Test that clean() respects normalize_whitespace config."""
+        # With normalization (default)
+        data = ExtractedData(config=Config(normalize_whitespace=True, remove_empty_lines=False))
         data.content_text = "Hello    World"
-        result = transforms.normalize_whitespace(data)
+        result = transforms.clean(data)
         assert result.cleaned_text == "Hello World"
 
-    def test_normalize_whitespace_preserves_single_newlines(self):
-        data = ExtractedData(config=Config())
-        data.content_text = "Hello\nWorld"
-        result = transforms.normalize_whitespace(data)
-        assert "Hello" in result.cleaned_text
-        assert "World" in result.cleaned_text
+        # Without normalization
+        data = ExtractedData(config=Config(normalize_whitespace=False, remove_empty_lines=False))
+        data.content_text = "Hello    World"
+        result = transforms.clean(data)
+        assert "    " in result.cleaned_text  # Multiple spaces preserved
+
+    def test_clean_respects_remove_empty_lines_config(self):
+        """Test that clean() respects remove_empty_lines config."""
+        # With empty line removal (default)
+        data = ExtractedData(config=Config(remove_empty_lines=True))
+        data.content_text = "Hello\n\n\nWorld"
+        result = transforms.clean(data)
+        assert result.cleaned_text == "Hello\nWorld"
+
+        # Without empty line removal
+        data = ExtractedData(config=Config(remove_empty_lines=False))
+        data.content_text = "Hello\n\n\nWorld"
+        result = transforms.clean(data)
+        assert "\n\n" in result.cleaned_text  # Paragraph breaks preserved
 
 
-class TestRemoveEmptyLinesTransform:
-    """Tests for empty line removal transform."""
+class TestTextNormalizerStaticMethods:
+    """Tests for TextNormalizer static methods (for direct use)."""
+
+    def test_normalize_whitespace_basic(self):
+        result = transforms.TextNormalizer.normalize_whitespace("Hello    World")
+        assert result == "Hello World"
+
+    def test_normalize_whitespace_preserves_paragraph_breaks(self):
+        result = transforms.TextNormalizer.normalize_whitespace("Hello\n\nWorld")
+        assert result == "Hello\n\nWorld"
+
+    def test_normalize_whitespace_collapses_excessive_newlines(self):
+        result = transforms.TextNormalizer.normalize_whitespace("Hello\n\n\n\nWorld")
+        assert result == "Hello\n\nWorld"
 
     def test_remove_empty_lines(self):
-        data = ExtractedData(config=Config())
-        data.content_text = "Hello\n\n\nWorld"
-        result = transforms.remove_empty_lines(data)
-        assert result.cleaned_text == "Hello\nWorld"
+        result = transforms.TextNormalizer.remove_empty_lines("Hello\n\n\nWorld")
+        assert result == "Hello\nWorld"
+
+    def test_clean_basic(self):
+        result = transforms.TextNormalizer.clean_basic("  Hello    World  ")
+        assert result == "Hello World"
 
 
 class TestChunkTransform:
@@ -193,16 +218,10 @@ class TestTransformSignatures:
         result = transforms.clean(data)
         assert isinstance(result, ExtractedData)
 
-    def test_normalize_whitespace_returns_extracted_data(self):
+    def test_deep_clean_returns_extracted_data(self):
         data = ExtractedData(config=Config())
         data.content_text = "test"
-        result = transforms.normalize_whitespace(data)
-        assert isinstance(result, ExtractedData)
-
-    def test_remove_empty_lines_returns_extracted_data(self):
-        data = ExtractedData(config=Config())
-        data.content_text = "test"
-        result = transforms.remove_empty_lines(data)
+        result = transforms.deep_clean(data)
         assert isinstance(result, ExtractedData)
 
     def test_chunk_returns_extracted_data(self):
@@ -254,9 +273,8 @@ class TestTransformChaining:
         The content should be cleaned and chunked.
         """
 
-        # Simulate pipeline
+        # Simulate pipeline - clean() now handles everything
         data = transforms.clean(data)
-        data = transforms.normalize_whitespace(data)
         data = transforms.chunk(data)
 
         assert data.current_stage == "chunking"

@@ -92,9 +92,6 @@ class Config:
         """
         Create Config from dictionary, ignoring unknown keys.
 
-        This allows backward compatibility with existing code that
-        may pass extra keys in the config dictionary.
-
         Args:
             config_dict: Dictionary with configuration values.
 

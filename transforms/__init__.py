@@ -4,7 +4,7 @@ Processing transforms for document processing.
 All transforms follow signature: (data: ExtractedData) -> ExtractedData
 """
 
-from .text_normalization import clean, normalize_whitespace, remove_empty_lines, deep_clean, TextNormalizer
+from .text_normalization import clean, deep_clean, TextNormalizer
 from .chunking import chunk, chunk_with_images, TextChunker
 from .ocr import ocr_enhance, describe_images, OCREnhancer, ImageDescriber
 from .llm import llm_chunk_semantic, llm_summarize, llm_extract_entities, llm_translate, LLMProcessor
@@ -13,8 +13,6 @@ from .upload import upload_to_dataloop, upload_metadata_only, dry_run_upload, Ch
 __all__ = [
     # Text Normalization
     'clean',
-    'normalize_whitespace',
-    'remove_empty_lines',
     'deep_clean',
     'TextNormalizer',
     # Chunking
