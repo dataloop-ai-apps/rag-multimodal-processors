@@ -10,6 +10,6 @@ RUN pip install -U \
     nltk>=3.8.0 \
     langchain-text-splitters>=0.0.1
 
-# docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.1 -f Dockerfile .
+# docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.1 -f apps/doc_processor/Dockerfile apps/doc_processor
 # docker push gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.1
 
