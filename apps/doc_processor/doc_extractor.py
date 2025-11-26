@@ -1,7 +1,7 @@
 """
-DOCX extraction logic separated from the main processor.
+DOCX extraction logic.
 
-This module handles all DOCX-specific extraction operations:
+Handles DOCX-specific extraction operations:
 - Text extraction from paragraphs
 - Image extraction from embedded resources
 - Table extraction with markdown conversion
@@ -23,29 +23,11 @@ logger = logging.getLogger("rag-preprocessor")
 
 
 class DOCExtractor:
-    """
-    Handles DOCX extraction operations.
-
-    All methods are static for stateless, concurrent-safe operation.
-    """
+    """DOCX extraction operations."""
 
     @staticmethod
     def extract(data: ExtractedData) -> ExtractedData:
-        """
-        Extract content from DOCX item.
-
-        Populates:
-        - data.content_text: Extracted text from paragraphs
-        - data.images: List of ImageContent
-        - data.tables: List of TableContent
-        - data.metadata: Document metadata
-
-        Args:
-            data: ExtractedData with item set
-
-        Returns:
-            ExtractedData with extraction results
-        """
+        """Extract content from DOCX item."""
         data.current_stage = "extraction"
 
         if not data.item:
@@ -53,7 +35,8 @@ class DOCExtractor:
             return data
 
         if Document is None:
-            data.log_error("python-docx not installed")
+            data.log_error("Required document library not installed. Check logs for details.")
+            logger.error("python-docx is required for DOCX extraction")
             return data
 
         try:
@@ -84,37 +67,25 @@ class DOCExtractor:
                 }
 
         except Exception as e:
-            data.log_error(f"DOCX extraction failed: {e}")
-            logger.exception("DOCX extraction error")
+            data.log_error("Document extraction failed. Check logs for details.")
+            logger.exception(f"DOCX extraction error: {e}")
 
         return data
 
     @staticmethod
     def _extract_images(doc, temp_dir: str) -> List[ImageContent]:
-        """
-        Extract embedded images from DOCX.
-
-        Args:
-            doc: python-docx Document object
-            temp_dir: Directory to save extracted images
-
-        Returns:
-            List of ImageContent objects
-        """
+        """Extract embedded images from DOCX."""
         images = []
 
         try:
             for rel in doc.part.rels.values():
                 if "image" in rel.target_ref:
-                    # Get filename from target reference
                     filename = rel.target_ref.split('/')[-1]
                     image_path = os.path.join(temp_dir, filename)
 
-                    # Write image data
                     with open(image_path, 'wb') as f:
                         f.write(rel.target_part.blob)
 
-                    # Extract extension
                     ext = filename.split('.')[-1] if '.' in filename else None
 
                     images.append(
@@ -134,15 +105,7 @@ class DOCExtractor:
 
     @staticmethod
     def _extract_tables(doc) -> List[TableContent]:
-        """
-        Extract tables from DOCX with markdown conversion.
-
-        Args:
-            doc: python-docx Document object
-
-        Returns:
-            List of TableContent objects
-        """
+        """Extract tables from DOCX with markdown conversion."""
         tables = []
 
         for table in doc.tables:
@@ -150,10 +113,8 @@ class DOCExtractor:
                 if not table.rows:
                     continue
 
-                # Get headers from first row
                 headers = [cell.text.strip() for cell in table.rows[0].cells]
 
-                # Get data rows
                 rows = []
                 for row in table.rows[1:]:
                     row_data = {}
@@ -162,7 +123,6 @@ class DOCExtractor:
                             row_data[headers[i]] = cell.text.strip()
                     rows.append(row_data)
 
-                # Convert to markdown
                 markdown = DOCExtractor._table_to_markdown(headers, rows)
 
                 tables.append(
@@ -178,26 +138,13 @@ class DOCExtractor:
 
     @staticmethod
     def _table_to_markdown(headers: List[str], rows: List[Dict]) -> str:
-        """
-        Convert table data to markdown format.
-
-        Args:
-            headers: List of column headers
-            rows: List of row dictionaries
-
-        Returns:
-            Markdown-formatted table string
-        """
+        """Convert table data to markdown format."""
         if not headers:
             return ""
 
-        # Header row
         md = "| " + " | ".join(headers) + " |\n"
-
-        # Separator row
         md += "| " + " | ".join(["---"] * len(headers)) + " |\n"
 
-        # Data rows
         for row in rows:
             values = [str(row.get(h, '')) for h in headers]
             md += "| " + " | ".join(values) + " |\n"

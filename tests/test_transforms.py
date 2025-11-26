@@ -139,28 +139,30 @@ class TestChunkWithImagesTransform:
 
 
 class TestTextChunker:
-    """Tests for TextChunker class."""
+    """Tests for TextChunker static class."""
 
     def test_chunker_recursive_strategy(self):
-        chunker = transforms.TextChunker(chunk_size=50, chunk_overlap=10, strategy='recursive')
-        chunks = chunker.chunk("This is some text that needs to be chunked into smaller pieces.")
+        chunks = transforms.TextChunker.chunk(
+            "This is some text that needs to be chunked into smaller pieces.",
+            chunk_size=50, chunk_overlap=10, strategy='recursive'
+        )
         assert len(chunks) > 0
 
     def test_chunker_fixed_strategy(self):
-        chunker = transforms.TextChunker(chunk_size=20, chunk_overlap=5, strategy='fixed')
-        chunks = chunker.chunk("This is some text that needs to be chunked.")
+        chunks = transforms.TextChunker.chunk(
+            "This is some text that needs to be chunked.",
+            chunk_size=20, chunk_overlap=5, strategy='fixed'
+        )
         assert len(chunks) > 0
 
     def test_chunker_none_strategy(self):
-        chunker = transforms.TextChunker(strategy='none')
         text = "This text should not be split."
-        chunks = chunker.chunk(text)
+        chunks = transforms.TextChunker.chunk(text, strategy='none')
         assert len(chunks) == 1
         assert chunks[0] == text
 
     def test_chunker_unknown_strategy_defaults_to_recursive(self):
-        chunker = transforms.TextChunker(strategy='unknown')
-        chunks = chunker.chunk("Some text to chunk.")
+        chunks = transforms.TextChunker.chunk("Some text to chunk.", strategy='unknown')
         assert len(chunks) > 0
 
 

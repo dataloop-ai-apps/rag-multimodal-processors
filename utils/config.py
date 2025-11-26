@@ -37,6 +37,7 @@ class Config:
 
     # OCR settings
     use_ocr: bool = False
+    ocr_method: Literal['local', 'batch', 'auto'] = 'local'
     ocr_model_id: Optional[str] = None
 
     # Chunking settings
@@ -47,6 +48,7 @@ class Config:
     # Cleaning settings
     normalize_whitespace: bool = True
     remove_empty_lines: bool = True
+    use_deep_clean: bool = False
 
     def validate(self) -> None:
         """
@@ -75,8 +77,8 @@ class Config:
             )
 
         # Validate OCR settings
-        if self.use_ocr and not self.ocr_model_id:
-            errors.append("ocr_model_id is required when use_ocr is True")
+        if self.use_ocr and self.ocr_method in ('batch', 'auto') and not self.ocr_model_id:
+            errors.append("ocr_model_id is required when ocr_method is 'batch' or 'auto'")
 
         # Validate error settings
         if self.max_errors <= 0:
@@ -124,10 +126,12 @@ class Config:
             'extract_images': self.extract_images,
             'extract_tables': self.extract_tables,
             'use_ocr': self.use_ocr,
+            'ocr_method': self.ocr_method,
             'ocr_model_id': self.ocr_model_id,
             'chunking_strategy': self.chunking_strategy,
             'max_chunk_size': self.max_chunk_size,
             'chunk_overlap': self.chunk_overlap,
             'normalize_whitespace': self.normalize_whitespace,
             'remove_empty_lines': self.remove_empty_lines,
+            'use_deep_clean': self.use_deep_clean,
         }

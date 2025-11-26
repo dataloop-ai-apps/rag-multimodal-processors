@@ -22,19 +22,19 @@ TARGET_DATASET_ID = "6910ba261a0566b56d15a55a"  # Dataloop Demo 2025 - rag prepr
 
 PDF_CONFIG = {
     'name': 'Test-PDF-Processor',
+    # Extraction settings
+    'extraction_method': 'basic',  # Options: 'markdown', 'basic'
+    'extract_images': True,
     # OCR Processing
-    'ocr_from_images': True,  # Extract images and apply OCR (uses EasyOCR)
-    'ocr_integration_method': 'separate_chunks',  # Options: 'append_to_page', 'separate_chunks', 'combine_all'
-    # Text Extraction
-    'use_markdown_extraction': False,
+    'use_ocr': False,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
     # Chunking Strategy
-    'chunking_strategy': (
-        'recursive'
-    ),  # Options: 'recursive', 'fixed-size', 'nltk-sentence', 'nltk-paragraphs', '1-chunk'
+    'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed', 'sentence', 'none'
     'max_chunk_size': 500,
     'chunk_overlap': 20,
     # Text Cleaning
-    'correct_spelling': True,
+    'normalize_whitespace': True,
+    'remove_empty_lines': True,
 }
 
 # ============================================================
@@ -43,15 +43,14 @@ PDF_CONFIG = {
 
 DOC_CONFIG = {
     'name': 'Test-DOC-Processor',
-    # Text Extraction
+    # Extraction settings
     'extract_images': True,
     'extract_tables': True,
     # Chunking Strategy
-    'chunking_strategy': (
-        'recursive'
-    ),  # Options: 'recursive', 'fixed-size', 'nltk-sentence', 'nltk-paragraphs', '1-chunk'
+    'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed', 'sentence', 'none'
     'max_chunk_size': 500,
     'chunk_overlap': 20,
     # Text Cleaning
-    'correct_spelling': True,
+    'normalize_whitespace': True,
+    'remove_empty_lines': True,
 }

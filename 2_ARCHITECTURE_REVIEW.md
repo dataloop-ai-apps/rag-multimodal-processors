@@ -10,7 +10,7 @@
 
 Review of `apps/`, `transforms/`, and `utils/` directories identified redundancies, type signature inconsistencies, and consolidation opportunities.
 
-**Progress:** Priority 1 and Priority 2 completed. 129 tests passing.
+**Progress:** All priorities completed. 131 tests passing.
 
 ---
 
@@ -73,18 +73,18 @@ Files updated (11 total):
 - `utils/text_cleaning.py`
 - `utils/errors.py`
 
-### 2.3 Remaining Redundancies (Future Work)
+### 2.3 Remaining Redundancies ✅ DONE
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| Duplicate text cleaning | Pending | `transforms/text_normalization.py` vs `utils/text_cleaning.py` |
-| Duplicate whitespace normalization | Pending | Within `text_normalization.py` |
-| Duplicate model execution | Pending | Multiple model calling patterns |
+| Duplicate text cleaning | ✅ Done | Extracted `clean_text_basic()` static function |
+| Duplicate whitespace normalization | ✅ Done | Extracted `normalize_whitespace_text()` static function |
+| Duplicate model execution | Pending | Multiple model calling patterns exist |
 | Duplicate processor `__init__` | Keep | Each processor remains self-contained |
 
 ---
 
-## 3. Type Signature & Stateless Design (Pending)
+## 3. Type Signature & Stateless Design ✅ COMPLETED
 
 ### 3.1 Design Principles
 
@@ -94,76 +94,143 @@ Files updated (11 total):
    - Must be **static/stateless** - no instance state, pure functions or static methods
    - All required data passed as parameters
 
-### 3.2 Sub-modules to Refactor
+### 3.2 Sub-modules Refactored ✅ DONE
 
-| Module | Current State | Required Change |
-|--------|---------------|-----------------|
-| `transforms/chunking.py` - `TextChunker` | Instance with `__init__` | Convert to static methods |
-| `apps/*/pdf_extractor.py` | Static but uses `ExtractedData` | Use explicit types |
-| `apps/*/doc_extractor.py` | Static but uses `ExtractedData` | Use explicit types |
-| `utils/ocr_utils.py` - `OCRProcessor` | Already static | Keep as-is |
-| `utils/text_cleaning.py` | Module functions | Keep as-is (already stateless) |
+| Module | Change Applied |
+|--------|----------------|
+| `transforms/chunking.py` - `TextChunker` | ✅ Converted to static methods |
+| `apps/pdf_processor/pdf_extractor.py` | ✅ Simplified to directly populate `ExtractedData` |
+| `apps/doc_processor/doc_extractor.py` | ✅ Simplified to directly populate `ExtractedData` |
+| `transforms/text_normalization.py` | ✅ Added `TextNormalizer` class with static methods |
+| `transforms/ocr.py` | ✅ Added `OCREnhancer` class (merged from `utils/ocr_utils.py`) |
+| `transforms/llm.py` | ✅ Added `LLMProcessor` class with static methods |
+| `transforms/upload.py` | ✅ Added `ChunkUploader` class (moved from `utils/upload.py`) |
 
-### 3.3 Target Pattern - Extractors
+### 3.3 Extractor Pattern (Simplified)
 
-**Current:**
+Extractors directly populate `ExtractedData` - no intermediate types needed:
+
 ```python
 class PDFExtractor:
     @staticmethod
     def extract(data: ExtractedData) -> ExtractedData:
+        """Extract content from PDF item."""
+        data.current_stage = "extraction"
+        # ... extraction logic directly populates data ...
+        data.content_text = extracted_text
+        data.images = images
+        data.metadata = {...}
+        return data
 ```
 
-**Target:**
-```python
-@dataclass
-class PDFExtractionResult:
-    text: str
-    images: List[ImageContent]
-    tables: List[TableContent]
-    metadata: Dict[str, Any]
-    errors: List[str]
+### 3.4 TextChunker Pattern (Implemented)
 
-class PDFExtractor:
-    @staticmethod
-    def extract(file_path: str, config: Config) -> PDFExtractionResult:
-        """Explicit input/output types for testability."""
-```
-
-### 3.4 Target Pattern - TextChunker
-
-**Current:**
-```python
-class TextChunker:
-    def __init__(self, chunk_size: int, chunk_overlap: int, strategy: str):
-        self.chunk_size = chunk_size  # Instance state
-```
-
-**Target:**
 ```python
 class TextChunker:
     @staticmethod
-    def chunk(text: str, chunk_size: int, chunk_overlap: int, strategy: str) -> List[str]:
+    def chunk(
+        text: str,
+        chunk_size: int = 300,
+        chunk_overlap: int = 20,
+        strategy: str = 'recursive'
+    ) -> List[str]:
         """Pure static function - no state, explicit types."""
 ```
 
 ---
 
-## 4. Config Alignment (Pending)
+## 4. Deep Text Cleaning Integration ✅ COMPLETED
 
-Options documented elsewhere but missing from `Config` class:
+### 4.1 New Transform: `deep_clean()`
 
-| Option | In Config? | Action |
-|--------|------------|--------|
-| `link_images_to_chunks` | No | Add or remove docs |
-| `embed_images_in_chunks` | No | Add or remove docs |
-| `image_marker_format` | No | Add or remove docs |
-| `llm_model_id` | No | Add or remove docs |
-| `vision_model_id` | No | Add or remove docs |
-| `ocr_integration_method` | No | Add or remove docs |
+Added `deep_clean()` transform to `transforms/text_normalization.py`:
+
+```python
+def deep_clean(data: ExtractedData) -> ExtractedData:
+    """Apply aggressive text cleaning using unstructured.io library."""
+```
+
+**Features:**
+- Extra whitespace removal
+- Dash and bullet normalization
+- Trailing punctuation removal
+- Lowercase conversion
+- Unicode quote replacement
+- Non-ASCII character cleaning
+- Broken paragraph grouping
+- Ordered bullet cleaning
+
+### 4.2 Config Option: `use_deep_clean`
+
+Added to `utils/config.py`:
+```python
+use_deep_clean: bool = False  # Enable aggressive text cleaning
+```
+
+### 4.3 Usage
+
+```python
+import transforms
+
+# Enable in config
+config = Config(use_deep_clean=True)
+data = ExtractedData(config=config)
+
+# Use in pipeline
+data = transforms.deep_clean(data)
+```
 
 ---
 
-## 5. Prioritized Action List
+## 5. OCR Integration Methods ✅ COMPLETED
+
+### 5.1 New Config Option: `ocr_method`
+
+Added to `utils/config.py`:
+```python
+ocr_method: Literal['local', 'batch', 'auto'] = 'local'
+```
+
+**Methods:**
+| Method | Description | Requires Model ID |
+|--------|-------------|-------------------|
+| `local` | Use EasyOCR locally (default) | No |
+| `batch` | Use Dataloop model for batch OCR | Yes |
+| `auto` | Try batch first, fallback to local | Yes |
+
+### 5.2 Updated Validation
+
+- `ocr_model_id` only required when `ocr_method` is `'batch'` or `'auto'`
+- Local OCR works without model ID
+
+### 5.3 Usage
+
+```python
+# Local OCR (no model needed)
+config = Config(use_ocr=True, ocr_method='local')
+
+# Batch OCR via Dataloop
+config = Config(use_ocr=True, ocr_method='batch', ocr_model_id='model-123')
+
+# Auto: try batch, fallback to local
+config = Config(use_ocr=True, ocr_method='auto', ocr_model_id='model-123')
+```
+
+### 5.4 Public OCR API
+
+| Transform | Description |
+|-----------|-------------|
+| `ocr_enhance()` | Single entry point for OCR - routes based on `ocr_method` config |
+| `describe_images()` | Generate image captions using vision model (different purpose) |
+
+**Internal routing** (private functions):
+- `_ocr_local()` - EasyOCR implementation
+- `_ocr_batch()` - Dataloop batch processing
+- `_ocr_auto()` - Try batch, fallback to local
+
+---
+
+## 6. Prioritized Action List
 
 ### Priority 1: Critical ✅ COMPLETED
 - [x] Remove `main.py`
@@ -174,54 +241,50 @@ Options documented elsewhere but missing from `Config` class:
 - [x] Consolidate upload functions (removed `upload_chunks_bulk`)
 - [x] Standardize all logger names to `"rag-preprocessor"`
 
-### Priority 3: Architecture Improvements (Static/Stateless)
-- [ ] Refactor `TextChunker` to use static methods (remove `__init__` state)
-- [ ] Refactor extractors to use explicit types (return `ExtractionResult` dataclass)
-- [ ] Consolidate model execution patterns to use `DataloopModelExecutor`
-- [ ] Ensure all sub-modules are stateless pure functions
+### Priority 3: Architecture Improvements (Static/Stateless) ✅ COMPLETED
+- [x] Refactor `TextChunker` to use static methods (remove `__init__` state)
+- [x] Simplify extractors to directly populate `ExtractedData`
+- [x] Add static classes: `TextNormalizer`, `OCREnhancer`, `LLMProcessor`, `ChunkUploader`
+- [x] Consolidate OCR utils into `transforms/ocr.py`
+- [x] Move upload transforms to `transforms/upload.py`
+- [ ] Consolidate model execution patterns to use `DataloopModelExecutor` (optional)
 
-### Priority 4: Config Cleanup
-- [ ] Align documented config options with `Config` class
-- [ ] Remove unused imports (e.g., `deep_clean` in text_normalization.py)
-
-### Priority 5: Optional Enhancements
-- [ ] Integrate deep text cleaning as optional mode
-- [ ] Implement all OCR integration methods
+### Priority 4: Optional Enhancements ✅ COMPLETED
+- [x] Integrate deep text cleaning as optional mode (`deep_clean()` transform)
+- [x] Implement OCR integration methods (`ocr_method` config option)
 
 ---
 
-## 6. Current Architecture
+## 7. Current Architecture
 
 ```
 apps/
     +-- pdf_processor/
     |       +-- app.py              # PDFProcessor (orchestration)
-    |       +-- pdf_extractor.py    # PDFExtractor (needs explicit types)
+    |       +-- pdf_extractor.py    # PDFExtractor (static, explicit types)
     +-- doc_processor/
             +-- app.py              # DOCProcessor (orchestration)
-            +-- doc_extractor.py    # DOCExtractor (needs explicit types)
+            +-- doc_extractor.py    # DOCExtractor (static, explicit types)
 
 transforms/                         # ExtractedData -> ExtractedData
-    +-- text_normalization.py
-    +-- chunking.py                 # TextChunker (needs static refactor)
-    +-- ocr.py
+    +-- text_normalization.py       # clean(), normalize_whitespace(), deep_clean()
+    +-- chunking.py                 # chunk() + TextChunker (static methods)
+    +-- ocr.py                      # ocr_enhance(), describe_images() (single OCR entry point)
     +-- llm.py
 
 utils/
     +-- extracted_data.py           # ExtractedData dataclass
-    +-- config.py                   # Config dataclass
+    +-- config.py                   # Config dataclass (with ocr_method, use_deep_clean)
     +-- errors.py                   # ErrorTracker
     +-- data_types.py               # ImageContent, TableContent
-    +-- dataloop_helpers.py         # upload_chunks (single implementation)
+    +-- dataloop_helpers.py         # upload_chunks, cleanup helpers
     +-- dataloop_model_executor.py
-    +-- ocr_utils.py                # OCRProcessor (already static)
-    +-- text_cleaning.py            # Already stateless
-    +-- upload.py                   # Transform wrappers only
+    +-- chunk_metadata.py           # ChunkMetadata dataclass
 ```
 
 ---
 
-## 7. Files Deleted
+## 8. Files Deleted
 
 - [x] `main.py`
 - [x] `ExtractedContent` class (from `utils/data_types.py`)
@@ -230,7 +293,28 @@ utils/
 
 ---
 
-## 8. Benefits of Static/Stateless Design
+## 9. Config Options Summary
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `error_mode` | `'stop'` \| `'continue'` | `'continue'` | Error handling mode |
+| `max_errors` | `int` | `10` | Max errors before stopping |
+| `extraction_method` | `'markdown'` \| `'basic'` | `'markdown'` | PDF extraction method |
+| `extract_images` | `bool` | `True` | Extract images from documents |
+| `extract_tables` | `bool` | `True` | Extract tables from documents |
+| `use_ocr` | `bool` | `False` | Enable OCR processing |
+| `ocr_method` | `'local'` \| `'batch'` \| `'auto'` | `'local'` | OCR method to use |
+| `ocr_model_id` | `str` \| `None` | `None` | Dataloop model ID for batch OCR |
+| `chunking_strategy` | `'recursive'` \| `'fixed'` \| `'sentence'` \| `'none'` | `'recursive'` | Text chunking strategy |
+| `max_chunk_size` | `int` | `300` | Maximum chunk size |
+| `chunk_overlap` | `int` | `20` | Overlap between chunks |
+| `normalize_whitespace` | `bool` | `True` | Normalize whitespace |
+| `remove_empty_lines` | `bool` | `True` | Remove empty lines |
+| `use_deep_clean` | `bool` | `False` | Enable deep text cleaning |
+
+---
+
+## 10. Benefits of Static/Stateless Design
 
 1. **Testability**: Static functions with explicit types are trivial to unit test
 2. **Clarity**: Function signature shows all inputs and outputs
@@ -240,16 +324,16 @@ utils/
 
 ---
 
-## 9. Test Status
+## 11. Test Status
 
-**129 tests passing** after Priority 1 and Priority 2 changes.
+**131 tests passing** after all changes.
 
 Test breakdown:
 - `test_chunk_metadata.py` - 10 tests
-- `test_data_types.py` - 4 tests (reduced from 8 after removing ExtractedContent)
+- `test_data_types.py` - 4 tests
 - `test_extracted_data.py` - 24 tests
 - `test_extractors.py` - 16 tests
 - `test_transforms.py` - 32 tests
-- `test_utils_config.py` - 16 tests
+- `test_utils_config.py` - 18 tests (added OCR method tests)
 - `test_utils_errors.py` - 22 tests
 - Other tests - 5 tests

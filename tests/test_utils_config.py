@@ -117,18 +117,32 @@ class TestConfigValidation:
         assert "chunk_overlap" in str(exc_info.value)
         assert "less than" in str(exc_info.value)
 
-    def test_invalid_ocr_without_model(self):
-        """Should reject OCR enabled without model ID."""
-        config = Config(use_ocr=True, ocr_model_id=None)
+    def test_invalid_ocr_batch_without_model(self):
+        """Should reject batch OCR without model ID."""
+        config = Config(use_ocr=True, ocr_method='batch', ocr_model_id=None)
 
         with pytest.raises(ValueError) as exc_info:
             config.validate()
 
         assert "ocr_model_id is required" in str(exc_info.value)
 
+    def test_invalid_ocr_auto_without_model(self):
+        """Should reject auto OCR without model ID."""
+        config = Config(use_ocr=True, ocr_method='auto', ocr_model_id=None)
+
+        with pytest.raises(ValueError) as exc_info:
+            config.validate()
+
+        assert "ocr_model_id is required" in str(exc_info.value)
+
+    def test_valid_ocr_local_without_model(self):
+        """Should accept local OCR without model ID."""
+        config = Config(use_ocr=True, ocr_method='local', ocr_model_id=None)
+        config.validate()  # Should not raise
+
     def test_valid_ocr_with_model(self):
-        """Should accept OCR enabled with model ID."""
-        config = Config(use_ocr=True, ocr_model_id='model-123')
+        """Should accept batch OCR with model ID."""
+        config = Config(use_ocr=True, ocr_method='batch', ocr_model_id='model-123')
         config.validate()  # Should not raise
 
     def test_invalid_max_errors(self):
@@ -184,9 +198,9 @@ class TestConfigToDict:
 
         expected_keys = {
             'error_mode', 'max_errors', 'extraction_method',
-            'extract_images', 'extract_tables', 'use_ocr', 'ocr_model_id',
+            'extract_images', 'extract_tables', 'use_ocr', 'ocr_method', 'ocr_model_id',
             'chunking_strategy', 'max_chunk_size', 'chunk_overlap',
-            'normalize_whitespace', 'remove_empty_lines'
+            'normalize_whitespace', 'remove_empty_lines', 'use_deep_clean'
         }
 
         assert set(config_dict.keys()) == expected_keys

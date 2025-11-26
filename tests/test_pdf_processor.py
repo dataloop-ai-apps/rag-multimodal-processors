@@ -11,6 +11,8 @@ Usage:
 
 import sys
 import traceback
+from unittest.mock import MagicMock
+
 import dtlpy as dl
 from apps.pdf_processor.app import PDFProcessor
 from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, PDF_CONFIG as CONFIG
@@ -20,6 +22,14 @@ if 'pdf' not in TEST_ITEMS:
     raise ValueError("'pdf' test configuration not found in TEST_ITEMS. Please add it to tests/test_config.py")
 
 ITEM_ID = TEST_ITEMS['pdf']['item_id']
+
+
+def _create_mock_context(config: dict) -> dl.Context:
+    """Create a mock dl.Context with the given config."""
+    context = MagicMock(spec=dl.Context)
+    context.node = MagicMock()
+    context.node.metadata = {'customNodeConfig': config}
+    return context
 
 
 def test_pdf_processor():
@@ -54,7 +64,8 @@ def test_pdf_processor():
 
     # Run processor
     print(f"\nProcessing PDF...")
-    chunk_items = PDFProcessor.run(item, target_dataset, CONFIG)
+    context = _create_mock_context(CONFIG)
+    chunk_items = PDFProcessor.run(item, target_dataset, context)
 
     # Results
     print(f"\n{'='*60}")

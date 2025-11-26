@@ -16,61 +16,73 @@ logger = logging.getLogger("rag-preprocessor")
 
 
 class TextChunker:
-    """Text chunker with support for multiple chunking strategies."""
+    """Text chunking with support for multiple strategies."""
 
-    def __init__(
-        self,
+    @staticmethod
+    def chunk(
+        text: str,
         chunk_size: int = 300,
         chunk_overlap: int = 20,
-        strategy: str = 'recursive',
-    ):
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
-        self.strategy = strategy
+        strategy: str = 'recursive'
+    ) -> List[str]:
+        """
+        Split text into chunks based on strategy.
 
-    def chunk(self, text: str) -> List[str]:
-        """Split text into chunks based on the configured strategy."""
-        logger.info(f"Chunking | strategy={self.strategy} size={self.chunk_size} overlap={self.chunk_overlap}")
+        Args:
+            text: Input text to chunk
+            chunk_size: Maximum size of each chunk
+            chunk_overlap: Overlap between chunks
+            strategy: Chunking strategy ('fixed', 'recursive', 'sentence', 'none')
 
-        if self.strategy == 'fixed':
-            chunks = self._chunk_fixed_size(text)
-        elif self.strategy == 'recursive':
-            chunks = self._chunk_recursive(text)
-        elif self.strategy == 'sentence':
-            chunks = self._chunk_sentence(text)
-        elif self.strategy == 'none':
+        Returns:
+            List of text chunks
+        """
+        logger.info(f"Chunking | strategy={strategy} size={chunk_size} overlap={chunk_overlap}")
+
+        if strategy == 'fixed':
+            chunks = TextChunker._chunk_fixed_size(text, chunk_size, chunk_overlap)
+        elif strategy == 'recursive':
+            chunks = TextChunker._chunk_recursive(text, chunk_size, chunk_overlap)
+        elif strategy == 'sentence':
+            chunks = TextChunker._chunk_sentence(text)
+        elif strategy == 'none':
             chunks = [text] if text else []
         else:
-            logger.warning(f"Unknown strategy: {self.strategy}, using recursive")
-            chunks = self._chunk_recursive(text)
+            logger.warning(f"Unknown strategy: {strategy}, using recursive")
+            chunks = TextChunker._chunk_recursive(text, chunk_size, chunk_overlap)
 
         logger.info(f"Chunking complete | chunks={len(chunks)}")
         return chunks
 
-    def _chunk_fixed_size(self, text: str) -> List[str]:
+    @staticmethod
+    def _chunk_fixed_size(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
         """Fixed-size chunking."""
         splitter = CharacterTextSplitter(
             separator="",
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
         )
         docs = splitter.create_documents([text])
         return [doc.page_content for doc in docs]
 
-    def _chunk_recursive(self, text: str) -> List[str]:
+    @staticmethod
+    def _chunk_recursive(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
         """Recursive chunking that respects semantic boundaries."""
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
             length_function=len,
         )
         docs = splitter.create_documents([text])
         return [doc.page_content for doc in docs]
 
-    def _chunk_sentence(self, text: str) -> List[str]:
+    @staticmethod
+    def _chunk_sentence(text: str) -> List[str]:
         """Chunk by sentence boundaries using NLTK."""
         return nltk.sent_tokenize(text)
 
+
+# Transform wrappers
 
 def chunk(data: ExtractedData) -> ExtractedData:
     """
@@ -80,12 +92,6 @@ def chunk(data: ExtractedData) -> ExtractedData:
     - 'semantic': Uses LLM-based semantic chunking
     - 'recursive' with images: Uses chunk_with_images for page/image association
     - Other strategies: Uses TextChunker (fixed, recursive, sentence, none)
-
-    Args:
-        data: ExtractedData with content
-
-    Returns:
-        ExtractedData with chunks populated
     """
     data.current_stage = "chunking"
     strategy = data.config.chunking_strategy
@@ -102,13 +108,12 @@ def chunk(data: ExtractedData) -> ExtractedData:
         data.chunks = []
         return data
 
-    chunker = TextChunker(
+    data.chunks = TextChunker.chunk(
+        text=content,
         chunk_size=data.config.max_chunk_size,
         chunk_overlap=data.config.chunk_overlap,
         strategy=strategy,
     )
-
-    data.chunks = chunker.chunk(content)
     data.metadata['chunking_strategy'] = strategy
     data.metadata['chunk_count'] = len(data.chunks)
 
@@ -116,15 +121,7 @@ def chunk(data: ExtractedData) -> ExtractedData:
 
 
 def chunk_with_images(data: ExtractedData) -> ExtractedData:
-    """
-    Chunk content and associate images based on page numbers.
-
-    Args:
-        data: ExtractedData with content and images
-
-    Returns:
-        ExtractedData with chunks and chunk_metadata populated
-    """
+    """Chunk content and associate images based on page numbers."""
     data.current_stage = "chunking"
     content = data.get_text()
 
@@ -138,13 +135,12 @@ def chunk_with_images(data: ExtractedData) -> ExtractedData:
     for match in re.finditer(r'---\s*Page\s+(\d+)\s*---', content, re.IGNORECASE):
         page_positions.append((match.start(), int(match.group(1))))
 
-    # Chunk the content
-    chunker = TextChunker(
+    chunks = TextChunker.chunk(
+        text=content,
         chunk_size=data.config.max_chunk_size,
         chunk_overlap=data.config.chunk_overlap,
         strategy='recursive',
     )
-    chunks = chunker.chunk(content)
 
     # Build chunk metadata with page and image associations
     chunk_metadata = []

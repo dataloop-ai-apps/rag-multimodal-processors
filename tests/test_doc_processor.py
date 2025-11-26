@@ -11,6 +11,8 @@ Usage:
 
 import sys
 import traceback
+from unittest.mock import MagicMock
+
 import dtlpy as dl
 from apps.doc_processor.app import DOCProcessor
 from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, DOC_CONFIG as CONFIG
@@ -23,6 +25,14 @@ ITEM_ID = TEST_ITEMS['doc']['item_id']
 
 if dl.token_expired():
     dl.login()
+
+
+def _create_mock_context(config: dict) -> dl.Context:
+    """Create a mock dl.Context with the given config."""
+    context = MagicMock(spec=dl.Context)
+    context.node = MagicMock()
+    context.node.metadata = {'customNodeConfig': config}
+    return context
 
 
 def test_doc_processor():
@@ -57,7 +67,8 @@ def test_doc_processor():
 
     # Run processor
     print(f"\nProcessing DOC/DOCX...")
-    chunk_items = DOCProcessor.run(item, target_dataset, CONFIG)
+    context = _create_mock_context(CONFIG)
+    chunk_items = DOCProcessor.run(item, target_dataset, context)
 
     # Results
     print(f"\n{'='*60}")
