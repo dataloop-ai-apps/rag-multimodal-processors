@@ -14,7 +14,7 @@ TEST_ITEMS = {
 }
 
 # Target dataset where chunks will be uploaded (REQUIRED)
-TARGET_DATASET_ID = "6910ba261a0566b56d15a55a"  # Dataloop Demo 2025 - rag preprocess testing
+TARGET_DATASET_ID = "6910ba261a0566b56d15a55a"  # Model mgmt demo: RAG demo source
 
 # ============================================================
 # PDF TEST CONFIGURATION
