@@ -43,10 +43,8 @@
           "type": "function",
           "namespace": "pdf-processor-service.pdf-processor-module.run"
         },
-        "name": "run",
-        "categories": [
-          "document-processing"
-        ],
+        "name": "pdf-processor-node",
+        "categories": ["document-processing"],
         "displayName": "PDF to Chunks",
         "description": "Process PDF documents to extract text, apply OCR, and create chunks",
         "scope": "project",
