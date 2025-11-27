@@ -54,7 +54,9 @@
                 "type": "string",
                 "default": "DOC-to-Chunks",
                 "required": true,
-                "placeholder": "Insert node name"
+                "placeholder": "Insert node name",
+                "redAsterisk": true,
+                "tooltip": "Unique name for this pipeline node"
               },
               "rules": [
                 {
@@ -65,13 +67,24 @@
               "widget": "dl-input"
             },
             {
+              "name": "correct_spelling",
+              "title": "Apply Text Cleaning",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "tooltip": "Clean and normalize text to fix formatting inconsistencies"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
               "name": "extract_tables",
               "title": "Extract Tables",
               "props": {
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "description": "Extract tables from DOCX and include them as markdown in chunks"
+                "tooltip": "Extract tables from DOCX and include them as markdown in chunks"
               },
               "widget": "dl-checkbox"
             },
@@ -82,7 +95,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": true,
-                "description": "Extract embedded images from DOCX"
+                "tooltip": "Extract embedded images from DOCX documents"
               },
               "widget": "dl-checkbox"
             },
@@ -93,6 +106,8 @@
                 "type": "string",
                 "required": true,
                 "default": "recursive",
+                "redAsterisk": true,
+                "tooltip": "Method for splitting text into chunks",
                 "options": [
                   {
                     "value": "fixed-size",
@@ -134,7 +149,9 @@
                 "max": 2000,
                 "step": 50,
                 "title": true,
-                "required": true
+                "required": true,
+                "redAsterisk": true,
+                "tooltip": "Maximum number of characters per chunk"
               },
               "rules": [
                 {
@@ -142,7 +159,14 @@
                   "effect": "error"
                 }
               ],
-              "widget": "dl-slider"
+              "widget": "dl-slider",
+              "dependsOn": [
+                {
+                  "field": "chunking_strategy",
+                  "value": "1-chunk",
+                  "operator": "notEquals"
+                }
+              ]
             },
             {
               "name": "chunk_overlap",
@@ -154,7 +178,9 @@
                 "max": 400,
                 "step": 10,
                 "title": true,
-                "required": true
+                "required": true,
+                "redAsterisk": true,
+                "tooltip": "Number of overlapping characters between consecutive chunks"
               },
               "rules": [
                 {
@@ -162,18 +188,14 @@
                   "effect": "error"
                 }
               ],
-              "widget": "dl-slider"
-            },
-            {
-              "name": "correct_spelling",
-              "title": "Apply Text Cleaning",
-              "props": {
-                "type": "boolean",
-                "title": true,
-                "default": false,
-                "description": "Apply text cleaning and normalization to fix formatting inconsistencies"
-              },
-              "widget": "dl-checkbox"
+              "widget": "dl-slider",
+              "dependsOn": [
+                {
+                  "field": "chunking_strategy",
+                  "value": "1-chunk",
+                  "operator": "notEquals"
+                }
+              ]
             }
           ]
         }
