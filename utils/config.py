@@ -41,7 +41,7 @@ class Config:
     ocr_model_id: Optional[str] = None
 
     # Chunking settings
-    chunking_strategy: Literal['recursive', 'fixed', 'sentence', 'none'] = 'recursive'
+    chunking_strategy: Literal['recursive', 'fixed-size', 'nltk-sentence', 'nltk-paragraphs', '1-chunk'] = 'recursive'
     max_chunk_size: int = 300
     chunk_overlap: int = 20
 

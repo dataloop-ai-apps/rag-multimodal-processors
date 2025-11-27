@@ -210,6 +210,16 @@
                   "field": "chunking_strategy",
                   "value": "1-chunk",
                   "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-sentence",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-paragraphs",
+                  "operator": "notEquals"
                 }
               ]
             },
@@ -238,6 +248,16 @@
                 {
                   "field": "chunking_strategy",
                   "value": "1-chunk",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-sentence",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-paragraphs",
                   "operator": "notEquals"
                 }
               ]
