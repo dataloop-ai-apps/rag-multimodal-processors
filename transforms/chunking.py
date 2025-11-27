@@ -32,20 +32,22 @@ class TextChunker:
             text: Input text to chunk
             chunk_size: Maximum size of each chunk
             chunk_overlap: Overlap between chunks
-            strategy: Chunking strategy ('fixed', 'recursive', 'sentence', 'none')
+            strategy: Chunking strategy ('fixed-size', 'recursive', 'nltk-sentence', 'nltk-paragraphs', '1-chunk')
 
         Returns:
             List of text chunks
         """
         logger.info(f"Chunking | strategy={strategy} size={chunk_size} overlap={chunk_overlap}")
 
-        if strategy == 'fixed':
+        if strategy == 'fixed-size':
             chunks = TextChunker._chunk_fixed_size(text, chunk_size, chunk_overlap)
         elif strategy == 'recursive':
             chunks = TextChunker._chunk_recursive(text, chunk_size, chunk_overlap)
-        elif strategy == 'sentence':
+        elif strategy == 'nltk-sentence':
             chunks = TextChunker._chunk_sentence(text)
-        elif strategy == 'none':
+        elif strategy == 'nltk-paragraphs':
+            chunks = TextChunker._chunk_paragraphs(text)
+        elif strategy == '1-chunk':
             chunks = [text] if text else []
         else:
             logger.warning(f"Unknown strategy: {strategy}, using recursive")
@@ -80,6 +82,11 @@ class TextChunker:
     def _chunk_sentence(text: str) -> List[str]:
         """Chunk by sentence boundaries using NLTK."""
         return nltk.sent_tokenize(text)
+
+    @staticmethod
+    def _chunk_paragraphs(text: str) -> List[str]:
+        """Chunk by paragraph boundaries using NLTK."""
+        return nltk.tokenize.blankline_tokenize(text)
 
 
 # Transform wrappers
