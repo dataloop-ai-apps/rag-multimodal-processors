@@ -39,7 +39,7 @@
           "type": "function",
           "namespace": "doc-processor-service.doc-processor-module.run"
         },
-        "name": "run",
+        "name": "doc-processor-node",
         "categories": ["document-processing"],
         "displayName": "DOC to Chunks",
         "description": "Process DOC/DOCX documents to extract text, tables, images, and create chunks",
