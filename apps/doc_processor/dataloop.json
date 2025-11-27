@@ -247,7 +247,7 @@
                 "name": "items"
               }
             ],
-            "displayIcon": "icon-dl-doc",
+            "displayIcon": "icon-dl-task",
             "displayName": "DOC to Chunks"
           }
         ]
