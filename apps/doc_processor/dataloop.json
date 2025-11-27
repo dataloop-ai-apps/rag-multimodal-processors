@@ -1,8 +1,8 @@
 {
-  "displayName": "DOC to Chunks",
-  "name": "doc_to_chunks",
+  "displayName": "RAG DOC Processor",
+  "name": "rag-doc-processor",
   "scope": "public",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "DOC/DOCX processing service that extracts text, tables, and images, and creates chunks for RAG pipelines. Supports multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
