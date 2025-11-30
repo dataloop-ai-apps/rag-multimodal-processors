@@ -31,24 +31,25 @@ class Config:
     max_errors: int = 10
 
     # Extraction settings
-    extraction_method: Literal['markdown', 'basic'] = 'markdown'
+    use_markdown_extraction: bool = False
     extract_images: bool = True
     extract_tables: bool = True
 
     # OCR settings
-    use_ocr: bool = False
+    ocr_from_images: bool = False
     ocr_method: Literal['local', 'batch', 'auto'] = 'local'
     ocr_model_id: Optional[str] = None
+    ocr_integration_method: Literal['append_to_page', 'separate_chunks', 'combine_all'] = 'append_to_page'
 
     # Chunking settings
     chunking_strategy: Literal['recursive', 'fixed-size', 'nltk-sentence', 'nltk-paragraphs', '1-chunk'] = 'recursive'
     max_chunk_size: int = 300
-    chunk_overlap: int = 20
+    chunk_overlap: int = 40
 
     # Cleaning settings
     normalize_whitespace: bool = True
     remove_empty_lines: bool = True
-    use_deep_clean: bool = False
+    to_correct_spelling: bool = False
 
     # LLM settings
     llm_model_id: Optional[str] = None
@@ -90,7 +91,7 @@ class Config:
             )
 
         # Validate OCR settings
-        if self.use_ocr and self.ocr_method in ('batch', 'auto') and not self.ocr_model_id:
+        if self.ocr_from_images and self.ocr_method in ('batch', 'auto') and not self.ocr_model_id:
             errors.append("ocr_model_id is required when ocr_method is 'batch' or 'auto'")
 
         # Validate LLM settings
@@ -117,8 +118,9 @@ class Config:
 
         Example:
             config = Config.from_dict({
-                'use_ocr': True,
-                'ocr_model_id': 'model-123',
+                'ocr_from_images': True,
+                'to_correct_spelling': True,
+                'use_markdown_extraction': False,
                 'unknown_key': 'ignored'  # Will be ignored
             })
         """

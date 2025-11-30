@@ -8,6 +8,7 @@ import logging
 from typing import List
 
 import dtlpy as dl
+import nltk
 
 import transforms
 from utils.extracted_data import ExtractedData
@@ -25,6 +26,12 @@ class DOCProcessor(dl.BaseServiceRunner):
         dl.client_api._upload_session_timeout = 60
         dl.client_api._upload_chuck_timeout = 30
 
+        for resource in ['tokenizers/punkt', 'taggers/averaged_perceptron_tagger']:
+            try:
+                nltk.data.find(resource)
+            except LookupError:
+                nltk.download(resource.split('/')[-1], quiet=True)
+
     @staticmethod
     def run(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
         """Process a DOCX document into chunks."""
@@ -34,7 +41,12 @@ class DOCProcessor(dl.BaseServiceRunner):
 
         try:
             data = DOCExtractor.extract(data)
-            data = transforms.clean(data)
+            if cfg.ocr_from_images:
+                data = transforms.ocr_enhance(data)
+            if cfg.to_correct_spelling:
+                data = transforms.deep_clean(data)
+            else:
+                data = transforms.clean(data)
             data = transforms.chunk(data)
             data = transforms.upload_to_dataloop(data)
 

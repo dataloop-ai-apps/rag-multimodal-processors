@@ -47,14 +47,19 @@ class DOCExtractor:
                 if data.config.extract_tables:
                     data.tables = DOCExtractor._extract_tables(doc)
 
-                # Extract content as markdown
-                data.content_text = DOCExtractor._extract_markdown(doc, data.tables)
+                # Extract content based on use_markdown_extraction setting
+                use_markdown = data.config.use_markdown_extraction
+
+                if use_markdown:
+                    data.content_text = DOCExtractor._extract_markdown(doc, data.tables)
+                else:
+                    data.content_text = DOCExtractor._extract_plain_text(doc)
 
                 # Set metadata
                 data.metadata = {
                     'source_file': data.item_name,
                     'extraction_method': 'python-docx',
-                    'format': 'markdown',
+                    'format': 'markdown' if use_markdown else 'plain',
                     'image_count': len(data.images),
                     'table_count': len(data.tables),
                     'processor': 'doc',
@@ -65,6 +70,11 @@ class DOCExtractor:
             logger.exception(f"DOCX extraction error: {e}")
 
         return data
+
+    @staticmethod
+    def _extract_plain_text(doc: Document) -> str:
+        """Extract plain text from DOCX without formatting."""
+        return '\n\n'.join(para.text for para in doc.paragraphs if para.text.strip())
 
     @staticmethod
     def _extract_markdown(doc: Document, tables: List[TableContent]) -> str:
