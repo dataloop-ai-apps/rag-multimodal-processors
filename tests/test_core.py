@@ -31,9 +31,9 @@ class TestConfig:
 
     def test_from_dict(self):
         """Config can be created from dict."""
-        config = Config.from_dict({'max_chunk_size': 500, 'use_ocr': True})
+        config = Config.from_dict({'max_chunk_size': 500, 'ocr_from_images': True})
         assert config.max_chunk_size == 500
-        assert config.use_ocr is True
+        assert config.ocr_from_images is True
 
     def test_from_dict_ignores_unknown_keys(self):
         """Unknown keys are ignored."""
@@ -42,10 +42,10 @@ class TestConfig:
 
     def test_to_dict_roundtrip(self):
         """Config survives dict roundtrip."""
-        original = Config(max_chunk_size=500, use_ocr=True)
+        original = Config(max_chunk_size=500, ocr_from_images=True)
         restored = Config.from_dict(original.to_dict())
         assert restored.max_chunk_size == original.max_chunk_size
-        assert restored.use_ocr == original.use_ocr
+        assert restored.ocr_from_images == original.ocr_from_images
 
     def test_validate_rejects_invalid_chunk_size(self):
         """Validation catches invalid chunk size."""
@@ -61,7 +61,7 @@ class TestConfig:
 
     def test_validate_rejects_batch_ocr_without_model(self):
         """Validation catches batch OCR without model ID."""
-        config = Config(use_ocr=True, ocr_method='batch', ocr_model_id=None)
+        config = Config(ocr_from_images=True, ocr_method='batch', ocr_model_id=None)
         with pytest.raises(ValueError, match="ocr_model_id"):
             config.validate()
 

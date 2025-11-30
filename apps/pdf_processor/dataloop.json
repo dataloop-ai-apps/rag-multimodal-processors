@@ -71,7 +71,7 @@
               "widget": "dl-input"
             },
             {
-              "name": "correct_spelling",
+              "name": "to_correct_spelling",
               "title": "Apply Text Cleaning",
               "props": {
                 "type": "boolean",
@@ -226,7 +226,7 @@
               "title": "Chunk Overlap",
               "props": {
                 "type": "number",
-                "default": 50,
+                "default": 40,
                 "min": 0,
                 "max": 400,
                 "step": 10,

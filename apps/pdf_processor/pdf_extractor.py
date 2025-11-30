@@ -37,7 +37,7 @@ class PDFExtractor:
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 file_path = data.item.download(local_path=temp_dir)
-                use_markdown = data.config.extraction_method == 'markdown'
+                use_markdown = data.config.use_markdown_extraction
                 extract_images = data.config.extract_images
 
                 if use_markdown:

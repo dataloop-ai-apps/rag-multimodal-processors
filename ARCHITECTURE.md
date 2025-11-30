@@ -360,3 +360,205 @@ pytest tests/test_processors.py -v
 - Stateless functions enable parallel document processing
 - No shared state or race conditions
 - Each `ExtractedData` instance is independent
+
+---
+
+## Improvement Suggestions & Questions for Design/Product Team
+
+This section documents design questions and technical decisions that need product/design team input.
+
+### Configuration Architecture
+
+#### Public API vs Internal Configuration
+**Current State:** Config class has 23 fields, but only 7 are exposed in the public API (dataloop.json).
+
+**Public API Fields (7):**
+- `ocr_from_images` – enable OCR on images (default: False)
+- `ocr_integration_method` – how OCR text is merged (append_to_page, separate_chunks, combine_all)
+- `use_markdown_extraction` – extract Markdown formatting (default: False)
+- `chunking_strategy` – text chunking method (recursive, fixed-size, nltk-sentence, nltk-paragraph, 1-chunk)
+- `max_chunk_size` – max size per chunk (default: 300)
+- `chunk_overlap` – overlap between chunks (default: 40)
+- `to_correct_spelling` – enable spell correction (default: False)
+
+**Internal-Only Fields (16):**
+- Error handling: `error_mode`, `max_errors`
+- Extraction: `extract_images`, `extract_tables`
+- OCR internals: `ocr_method`, `ocr_model_id`
+- Cleaning: `normalize_whitespace`, `remove_empty_lines`
+- Upload: `remote_path`
+- **Unused LLM:** `llm_model_id`, `generate_summary`, `extract_entities`, `translate`, `target_language`
+- **Unused Vision:** `vision_model_id`
+
+---
+
+### Questions for Product/Design Team
+
+#### 1. Unused Feature Fields (LLM & Vision)
+**Status:** Fields exist but are not implemented
+
+**LLM Fields:**
+- `llm_model_id`, `generate_summary`, `extract_entities`, `translate`, `target_language`
+- Functions exist but log "not yet implemented"
+- Validation logic exists but can never be used
+
+**Vision Fields:**
+- `vision_model_id`
+- `describe_images()` returns immediately without processing
+
+**Questions:**
+1. Should we remove these fields until there's active development?
+2. Or keep them as "reserved for future use" with TODO comments?
+3. If keeping, should we remove the validation logic that can never trigger?
+
+**Impact:** Keeping them adds dead code and suggests features that don't exist
+
+**Recommendation:** Remove entirely until implementation is planned
+
+---
+
+#### 2. Image & Table Extraction Control
+**Status:** `extract_images=True` and `extract_tables=True` in Config but NOT in public API
+
+**Current Behavior:**
+- Images and tables are always extracted
+- Users cannot disable this through the UI
+- Config fields exist but are hardcoded to `True`
+
+**Questions:**
+1. Should these be:
+   - **Option A:** Always enabled (remove from config, hardcode in extractors)
+   - **Option B:** Added to public API as user-configurable checkboxes
+   - **Option C:** Kept internal-only for future optimization use cases
+
+2. Is there a use case for disabling image/table extraction in RAG pipelines?
+
+**Recommendation:** Option A (always extract) - simplifies code and matches expected RAG behavior
+
+---
+
+#### 3. Config Class Structure
+**Current Confusion:** Developers cannot easily tell which fields are user-facing vs internal
+
+**Questions:**
+1. Should we split into `PublicConfig` (7 fields) and `InternalConfig` (internal fields)?
+2. Or document clearly which fields are public in code comments?
+
+**Impact:**
+- Splitting improves code clarity significantly
+- Requires refactoring but no API changes
+
+**Recommendation:** Split for clarity, or at minimum add clear documentation
+
+---
+
+### Field Naming & UX Questions
+
+#### 4. Field Name: `to_correct_spelling`
+**Current State:** Grammatically awkward field name
+
+**Issues:**
+- Grammar: "to correct" vs "correct"
+- Misleading: Actually triggers "deep clean" (not just spell correction)
+- UI Label: "Apply Text Cleaning" (clearer than field name)
+
+**Questions:**
+1. Can we rename to match behavior better?
+   - Options: `apply_text_cleaning`, `deep_clean`, `enable_deep_clean`
+2. Or keep field name as-is and rely on UI label?
+
+**Impact:** Renaming is a breaking API change
+
+**Recommendation:** Keep field name, ensure UI tooltip explains it's more than spelling
+
+---
+
+#### 5. OCR Integration Method Naming
+**Current Options:**
+- `append_to_page` - Appends OCR text after each page marker
+- `separate_chunks` - Creates separate section at end with page markers
+- `combine_all` - Combines all OCR at end without page markers
+
+**Potential Confusion:**
+- "separate_chunks" doesn't create separate chunks - it's a separate section
+- Distinction between `separate_chunks` and `combine_all` is subtle
+
+**Questions:**
+1. Have users reported confusion about these names?
+2. Should we rename for clarity (breaking change)?
+3. Or improve tooltips/documentation?
+
+**Recommendation:** Keep names unless user feedback indicates confusion
+
+---
+
+#### 6. Chunking Strategy & Field Dependencies
+**Current Behavior:**
+- `chunking_strategy='1-chunk'` ignores `max_chunk_size` and `chunk_overlap`
+- `chunking_strategy='nltk-sentence'` ignores `chunk_overlap`
+- All fields are always visible in UI
+
+**Questions:**
+1. Should we hide incompatible fields using `dependsOn` in dataloop.json?
+2. Should we show warning messages when incompatible options are selected?
+3. Or document the behavior and let users configure freely?
+
+**Recommendation:** Use `dependsOn` to hide incompatible fields - reduces confusion
+
+---
+
+### Feature Roadmap Questions
+
+#### 7. Batch OCR Implementation
+**Current State:**
+- `ocr_method` config field exists with options: `local`, `batch`, `auto`
+- Only `local` (EasyOCR) works
+- `batch` and `auto` fall back to `local` with warning log
+- Field is internal-only (not exposed in UI)
+
+**Questions:**
+1. Is batch OCR planned for near-term development?
+2. If not, should we remove this field from config?
+3. Should users ever see this option?
+
+**Recommendation:** Keep internal until batch OCR is implemented
+
+---
+
+### Documentation Gaps
+
+#### 8. Pipeline Flow & Field Interactions
+**Missing Documentation:**
+1. Which config fields are public vs internal
+2. Standard processing pipeline flow
+3. How config fields affect pipeline behavior
+4. Field interactions (e.g., `to_correct_spelling` → `deep_clean` instead of `clean`)
+
+**Questions:**
+1. Where should this be documented?
+   - README.md for developers?
+   - Inline tooltips for users?
+   - Separate user guide?
+2. Who is the audience - end users or developers?
+
+**Recommendation:** Add to README.md and expand tooltips in dataloop.json
+
+---
+
+### Summary of Decisions Needed
+
+| Priority | Question | Options | Recommendation |
+|----------|----------|---------|----------------|
+| **HIGH** | Remove unused LLM/Vision fields? | Remove / Keep as TODO | **Remove** |
+| **HIGH** | Image/table extraction control? | Always-on / Configurable / Internal | **Always-on** |
+| **MEDIUM** | Split Public/Internal Config? | Split / Document only | **Split** |
+| **MEDIUM** | Rename `to_correct_spelling`? | Rename / Keep | **Keep** |
+| **MEDIUM** | OCR method names confusing? | Rename / Keep / Improve tooltips | **Keep + tooltips** |
+| **MEDIUM** | Hide incompatible chunking fields? | Yes / No | **Yes** |
+| **LOW** | Batch OCR roadmap? | Plan / Remove | **Clarify** |
+| **LOW** | Documentation location? | README / Tooltips / Guide | **Both** |
+
+---
+
+**Last Updated:** 2025-11-30
+**Status:** Alpha - awaiting product team input on configuration architecture
