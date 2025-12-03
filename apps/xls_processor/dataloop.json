@@ -1,0 +1,300 @@
+{
+  "displayName": "RAG Excel Processor",
+  "name": "rag-xls-processor",
+  "scope": "public",
+  "version": "0.1.6",
+  "description": "Excel (XLS/XLSX) processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
+  "attributes": {
+    "Category": "Application",
+    "Provider": "Dataloop",
+    "Deployed By": "Dataloop",
+    "License": "Apache 2.0",
+    "Application Type": [
+      "Pipeline Node"
+    ],
+    "Media Type": [
+      "Document"
+    ]
+  },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.6"
+  },
+  "components": {
+    "computeConfigs": [
+      {
+        "name": "xls-processor-service",
+        "runtime": {
+          "podType": "regular-m",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/xls-processor:0.0.1",
+          "concurrency": 25,
+          "autoscaler": {
+            "minReplicas": 0,
+            "maxReplicas": 10,
+            "queueLength": 100
+          }
+        }
+      }
+    ],
+    "pipelineNodes": [
+      {
+        "invoke": {
+          "type": "function",
+          "namespace": "xls-processor-service.xls-processor-module.run"
+        },
+        "name": "xls-processor-node",
+        "categories": ["document-processing"],
+        "displayName": "Excel to Chunks",
+        "description": "Process Excel (XLS/XLSX) documents to extract text, tables, images, apply OCR, and create chunks",
+        "scope": "project",
+        "configuration": {
+          "fields": [
+            {
+              "name": "name",
+              "title": "Node Name",
+              "props": {
+                "title": true,
+                "type": "string",
+                "default": "Excel-to-Chunks",
+                "required": true,
+                "placeholder": "Insert node name",
+                "redAsterisk": true,
+                "tooltip": "Unique name for this pipeline node"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-input"
+            },
+            {
+              "name": "to_correct_spelling",
+              "title": "Apply Text Cleaning",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "tooltip": "Clean and normalize text to fix formatting inconsistencies"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "ocr_from_images",
+              "title": "Extract Text from Images (OCR)",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "tooltip": "Extract images from Excel and apply OCR to extract text from them"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "ocr_integration_method",
+              "title": "OCR Integration Method",
+              "props": {
+                "type": "string",
+                "required": true,
+                "default": "append_to_page",
+                "redAsterisk": true,
+                "tooltip": "How to integrate OCR text with document text",
+                "options": [
+                  {
+                    "value": "append_to_page",
+                    "label": "Append to Page Text"
+                  },
+                  {
+                    "value": "separate_chunks",
+                    "label": "Create Separate Chunks"
+                  },
+                  {
+                    "value": "combine_all",
+                    "label": "Combine All Text"
+                  }
+                ]
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-select",
+              "dependsOn": [
+                {
+                  "field": "ocr_from_images",
+                  "value": true,
+                  "operator": "equals"
+                }
+              ]
+            },
+            {
+              "name": "use_markdown_extraction",
+              "title": "Use Markdown Extraction",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "tooltip": "Extract Excel as Markdown for better structure preservation"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "chunking_strategy",
+              "title": "Chunking Strategy",
+              "props": {
+                "type": "string",
+                "required": true,
+                "default": "recursive",
+                "redAsterisk": true,
+                "tooltip": "Method for splitting text into chunks",
+                "options": [
+                  {
+                    "value": "fixed-size",
+                    "label": "Fixed Size"
+                  },
+                  {
+                    "value": "recursive",
+                    "label": "Recursive"
+                  },
+                  {
+                    "value": "nltk-sentence",
+                    "label": "NLTK Sentence"
+                  },
+                  {
+                    "value": "nltk-paragraphs",
+                    "label": "NLTK Paragraphs"
+                  },
+                  {
+                    "value": "1-chunk",
+                    "label": "Single Chunk"
+                  }
+                ]
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-select"
+            },
+            {
+              "name": "max_chunk_size",
+              "title": "Max Chunk Size",
+              "props": {
+                "type": "number",
+                "default": 300,
+                "min": 1,
+                "max": 2000,
+                "step": 50,
+                "title": true,
+                "required": true,
+                "redAsterisk": true,
+                "tooltip": "Maximum number of characters per chunk"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider",
+              "dependsOn": [
+                {
+                  "field": "chunking_strategy",
+                  "value": "1-chunk",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-sentence",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-paragraphs",
+                  "operator": "notEquals"
+                }
+              ]
+            },
+            {
+              "name": "chunk_overlap",
+              "title": "Chunk Overlap",
+              "props": {
+                "type": "number",
+                "default": 40,
+                "min": 0,
+                "max": 400,
+                "step": 10,
+                "title": true,
+                "required": true,
+                "redAsterisk": true,
+                "tooltip": "Number of overlapping characters between consecutive chunks"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider",
+              "dependsOn": [
+                {
+                  "field": "chunking_strategy",
+                  "value": "1-chunk",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-sentence",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-paragraphs",
+                  "operator": "notEquals"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "modules": [
+      {
+        "name": "xls-processor-module",
+        "computeConfig": "xls-processor-service",
+        "entryPoint": "apps/xls_processor/app.py",
+        "className": "XLSProcessor",
+        "initInputs": [],
+        "functions": [
+          {
+            "name": "run",
+            "input": [
+              {
+                "type": "Item",
+                "name": "item"
+              },
+              {
+                "type": "Dataset",
+                "name": "target_dataset"
+              }
+            ],
+            "output": [
+              {
+                "type": "Item[]",
+                "name": "items"
+              }
+            ],
+            "displayIcon": "icon-dl-task",
+            "displayName": "Excel to Chunks"
+          }
+        ]
+      }
+    ]
+  }
+}
