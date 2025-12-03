@@ -2,7 +2,7 @@
   "displayName": "RAG DOC Processor",
   "name": "rag-doc-processor",
   "scope": "public",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "DOC/DOCX processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
