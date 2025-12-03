@@ -41,9 +41,12 @@ class PDFProcessor(dl.BaseServiceRunner):
 
         try:
             data = PDFExtractor.extract(data)
-            if cfg.use_ocr:
+            if cfg.ocr_from_images:
                 data = transforms.ocr_enhance(data)
-            data = transforms.clean(data)
+            if cfg.to_correct_spelling:
+                data = transforms.deep_clean(data)
+            else:
+                data = transforms.clean(data)
             data = transforms.chunk(data)
             data = transforms.upload_to_dataloop(data)
 

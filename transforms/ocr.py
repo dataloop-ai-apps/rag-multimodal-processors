@@ -87,8 +87,8 @@ class OCREnhancer:
         return OCREnhancer.extract_local(images)
 
     @staticmethod
-    def integrate_ocr_per_page(content: str, ocr_by_page: Dict[int, List[str]]) -> str:
-        """Integrate OCR text into content on a per-page basis."""
+    def integrate_ocr_append_to_page(content: str, ocr_by_page: Dict[int, List[str]]) -> str:
+        """Integrate OCR text by appending to each page."""
         page_pattern = r'(--- Page (\d+) ---)'
         parts = re.split(page_pattern, content)
 
@@ -127,6 +127,37 @@ class OCREnhancer:
                 break
 
         return ''.join(result_parts)
+
+    @staticmethod
+    def integrate_ocr_separate_chunks(content: str, ocr_by_page: Dict[int, List[str]]) -> str:
+        """Integrate OCR text as a separate section at the end."""
+        all_ocr_texts = []
+        for page_num in sorted(ocr_by_page.keys()):
+            if ocr_by_page[page_num]:
+                for idx, ocr_text in enumerate(ocr_by_page[page_num], 1):
+                    page_info = f" (Page {page_num})" if page_num else ""
+                    all_ocr_texts.append(f"--- Image {idx}{page_info} ---\n{ocr_text}")
+
+        if all_ocr_texts:
+            return content + '\n\n--- OCR Extracted Text (Separate Section) ---\n\n' + '\n\n'.join(all_ocr_texts)
+        return content
+
+    @staticmethod
+    def integrate_ocr_combine_all(content: str, ocr_by_page: Dict[int, List[str]]) -> str:
+        """Integrate OCR text by combining all at the end without page markers."""
+        all_ocr_texts = []
+        for page_num in sorted(ocr_by_page.keys()):
+            all_ocr_texts.extend(ocr_by_page[page_num])
+
+        if all_ocr_texts:
+            combined_ocr = '\n\n'.join(all_ocr_texts)
+            return content + '\n\n--- All OCR Text Combined ---\n\n' + combined_ocr
+        return content
+
+    @staticmethod
+    def integrate_ocr_per_page(content: str, ocr_by_page: Dict[int, List[str]]) -> str:
+        """Legacy method - calls integrate_ocr_append_to_page for backward compatibility."""
+        return OCREnhancer.integrate_ocr_append_to_page(content, ocr_by_page)
 
     @staticmethod
     def _extract_with_easyocr(image_path: str) -> Tuple[str, Optional[str]]:
@@ -188,7 +219,7 @@ def ocr_enhance(data: ExtractedData) -> ExtractedData:
     """
     data.current_stage = "ocr"
 
-    if not data.config.use_ocr:
+    if not data.config.ocr_from_images:
         return data
 
     if not data.images:
@@ -210,13 +241,21 @@ def ocr_enhance(data: ExtractedData) -> ExtractedData:
     if not ocr_by_page:
         return data
 
-    data.content_text = OCREnhancer.integrate_ocr_per_page(data.content_text, ocr_by_page)
+    # Use the configured OCR integration method
+    integration_method = data.config.ocr_integration_method
+    if integration_method == 'separate_chunks':
+        data.content_text = OCREnhancer.integrate_ocr_separate_chunks(data.content_text, ocr_by_page)
+    elif integration_method == 'combine_all':
+        data.content_text = OCREnhancer.integrate_ocr_combine_all(data.content_text, ocr_by_page)
+    else:  # Default to 'append_to_page'
+        data.content_text = OCREnhancer.integrate_ocr_append_to_page(data.content_text, ocr_by_page)
 
     total_ocr_length = sum(len(t) for texts in ocr_by_page.values() for t in texts)
     total_ocr_count = sum(len(texts) for texts in ocr_by_page.values())
 
     data.metadata['ocr_applied'] = True
     data.metadata['ocr_method'] = 'local'
+    data.metadata['ocr_integration_method'] = integration_method
     data.metadata['ocr_text_length'] = total_ocr_length
     data.metadata['ocr_image_count'] = total_ocr_count
 
