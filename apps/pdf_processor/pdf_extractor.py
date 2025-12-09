@@ -13,6 +13,7 @@ import tempfile
 from typing import List, Tuple, Dict, Any
 
 import fitz
+import pymupdf.layout
 import pymupdf4llm
 
 from utils.extracted_data import ExtractedData
