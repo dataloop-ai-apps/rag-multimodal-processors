@@ -2,7 +2,7 @@
   "displayName": "RAG PDF Processor",
   "name": "rag-pdf-processor",
   "scope": "public",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "PDF processing service that extracts text, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
