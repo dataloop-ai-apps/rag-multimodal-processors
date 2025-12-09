@@ -13,7 +13,7 @@ import nltk
 import transforms
 from utils.extracted_data import ExtractedData
 from utils.config import Config
-from doc_extractor import DOCExtractor
+from apps.doc_processor.doc_extractor import DOCExtractor
 
 logger = logging.getLogger("rag-preprocessor")
 

@@ -13,7 +13,7 @@ import nltk
 import transforms
 from utils.extracted_data import ExtractedData
 from utils.config import Config
-from pdf_extractor import PDFExtractor
+from apps.pdf_processor.pdf_extractor import PDFExtractor
 
 logger = logging.getLogger("rag-preprocessor")
 
