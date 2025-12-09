@@ -13,7 +13,6 @@ import tempfile
 from typing import List, Tuple, Dict, Any
 
 import fitz
-import pymupdf.layout  # Must be imported before pymupdf4llm for ML layout features
 import pymupdf4llm
 
 from utils.extracted_data import ExtractedData
