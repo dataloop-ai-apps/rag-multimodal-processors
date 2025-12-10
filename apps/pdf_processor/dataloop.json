@@ -2,7 +2,7 @@
   "displayName": "RAG PDF Processor",
   "name": "rag-pdf-processor",
   "scope": "public",
-  "version": "0.1.7",
+  "version": "0.1.9",
   "description": "PDF processing service that extracts text, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
@@ -15,6 +15,11 @@
     "Media Type": [
       "Document"
     ]
+  },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.9"
   },
   "components": {
     "computeConfigs": [

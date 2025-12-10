@@ -2,7 +2,7 @@
   "displayName": "RAG DOC Processor",
   "name": "rag-doc-processor",
   "scope": "public",
-  "version": "0.1.7",
+  "version": "0.1.9",
   "description": "DOC/DOCX processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
@@ -11,6 +11,11 @@
     "License": "Apache 2.0",
     "Application Type": ["Pipeline Node"],
     "Media Type": ["Document"]
+  },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.9"
   },
   "components": {
     "computeConfigs": [
