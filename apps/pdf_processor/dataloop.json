@@ -27,7 +27,7 @@
         "name": "pdf-processor-service",
         "runtime": {
           "podType": "regular-m",
-          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pdf-processor:0.0.2",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pdf-processor:0.0.3",
           "concurrency": 25,
           "autoscaler": {
             "minReplicas": 0,
