@@ -12,6 +12,11 @@
     "Application Type": ["Pipeline Node"],
     "Media Type": ["Document"]
   },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.9"
+  },
   "components": {
     "computeConfigs": [
       {

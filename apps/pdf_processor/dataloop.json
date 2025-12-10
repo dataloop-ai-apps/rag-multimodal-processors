@@ -16,13 +16,18 @@
       "Document"
     ]
   },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.9"
+  },
   "components": {
     "computeConfigs": [
       {
         "name": "pdf-processor-service",
         "runtime": {
           "podType": "regular-m",
-          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pdf-processor:0.0.1",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pdf-processor:0.0.3",
           "concurrency": 25,
           "autoscaler": {
             "minReplicas": 0,
