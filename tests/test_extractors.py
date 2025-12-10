@@ -1,13 +1,15 @@
-"""Tests for PDF and DOC extractors."""
+"""Tests for PDF, DOC, and XLS extractors."""
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import os
 import tempfile
+import pandas as pd
 
 from utils.extracted_data import ExtractedData
 from utils.config import Config
 from apps.pdf_processor.pdf_extractor import PDFExtractor
 from apps.doc_processor.doc_extractor import DOCExtractor
+from apps.xls_processor.xls_extractor import XLSExtractor
 
 
 class TestPDFExtractorBasics:
@@ -253,3 +255,169 @@ class TestExtractorIntegration:
         # Verify config is accessible
         assert data.config.extract_images is False
         assert data.config.extract_tables is False
+
+
+class TestXLSExtractorBasics:
+    """Test XLSExtractor basic behavior."""
+
+    def test_extract_without_item_logs_error(self):
+        """Should log error when no item provided."""
+        data = ExtractedData()
+
+        result = XLSExtractor.extract(data)
+
+        assert len(result.errors.errors) > 0
+        assert "No item provided" in result.errors.errors[0]
+
+    def test_extract_sets_current_stage(self):
+        """Should set current_stage to extraction."""
+        data = ExtractedData()
+
+        XLSExtractor.extract(data)
+
+        assert data.current_stage == "extraction"
+
+
+class TestXLSExtractorWithMocks:
+    """Test XLSExtractor with mocked Excel library."""
+
+    @pytest.fixture
+    def mock_pandas(self):
+        """Create mock pandas ExcelFile."""
+        with patch('apps.xls_processor.xls_extractor.pd') as mock_pd:
+            # Setup mock ExcelFile
+            mock_excel_file = MagicMock()
+            mock_excel_file.sheet_names = ['Sheet1', 'Sheet2']
+            
+            # Mock DataFrame for Sheet1
+            mock_df1 = MagicMock()
+            mock_df1.empty = False
+            mock_df1.iloc = [MagicMock()]
+            mock_df1.columns = [0, 1, 2]
+            mock_df1.iterrows.return_value = [
+                (0, pd.Series(['Value1', 'Value2', 'Value3'])),
+                (1, pd.Series(['Value4', 'Value5', 'Value6']))
+            ]
+            
+            # Mock DataFrame for Sheet2
+            mock_df2 = MagicMock()
+            mock_df2.empty = False
+            mock_df2.iloc = [MagicMock()]
+            mock_df2.columns = [0, 1]
+            mock_df2.iterrows.return_value = [
+                (0, pd.Series(['A', 'B']))
+            ]
+            
+            mock_excel_file.__enter__ = lambda self: self
+            mock_excel_file.__exit__ = lambda *args: None
+            
+            def mock_read_excel(excel_file, sheet_name=None, header=None):
+                if sheet_name == 'Sheet1':
+                    return mock_df1
+                elif sheet_name == 'Sheet2':
+                    return mock_df2
+                return mock_df1
+            
+            mock_pd.ExcelFile.return_value = mock_excel_file
+            mock_pd.read_excel = mock_read_excel
+            mock_pd.notna = lambda x: x is not None
+            
+            yield mock_pd
+
+    @pytest.fixture
+    def mock_openpyxl(self):
+        """Create mock openpyxl workbook."""
+        with patch('apps.xls_processor.xls_extractor.load_workbook') as mock_load:
+            mock_workbook = MagicMock()
+            mock_workbook.sheetnames = ['Sheet1']
+            mock_sheet = MagicMock()
+            mock_sheet._images = []
+            mock_workbook.__getitem__ = lambda self, key: mock_sheet
+            mock_load.return_value = mock_workbook
+            yield mock_load
+
+    @pytest.fixture
+    def mock_item(self):
+        """Create mock Dataloop item."""
+        item = Mock()
+        item.name = "test.xlsx"
+        item.id = "item-789"
+
+        def mock_download(local_path=None):
+            path = os.path.join(local_path or tempfile.gettempdir(), "test.xlsx")
+            with open(path, 'wb') as f:
+                f.write(b'fake xlsx content')
+            return path
+
+        item.download = mock_download
+        return item
+
+    def test_extract_basic_text(self, mock_pandas, mock_openpyxl, mock_item):
+        """Should extract text using basic pandas."""
+        config = Config(extract_images=False, extract_tables=False, use_markdown_extraction=False)
+        data = ExtractedData(item=mock_item, config=config)
+
+        result = XLSExtractor.extract(data)
+
+        assert "Sheet" in result.content_text
+        assert result.metadata.get('extraction_method') == 'pandas-openpyxl'
+        assert result.metadata.get('processor') == 'xls'
+        assert len(result.errors.errors) == 0
+
+    def test_extract_populates_metadata(self, mock_pandas, mock_openpyxl, mock_item):
+        """Should populate metadata correctly."""
+        config = Config(extract_images=False, extract_tables=False)
+        data = ExtractedData(item=mock_item, config=config)
+
+        result = XLSExtractor.extract(data)
+
+        assert result.metadata.get('source_file') == 'test.xlsx'
+        assert result.metadata.get('processor') == 'xls'
+        assert result.metadata.get('image_count') == 0
+        assert result.metadata.get('table_count') == 0
+
+
+class TestXLSExtractorTableConversion:
+    """Test table to markdown conversion."""
+
+    def test_table_to_markdown_basic(self):
+        """Should convert table to markdown format."""
+        headers = ["Name", "Age", "City"]
+        rows = [
+            {"Name": "Alice", "Age": "30", "City": "NYC"},
+            {"Name": "Bob", "Age": "25", "City": "LA"},
+        ]
+
+        result = XLSExtractor._table_to_markdown(headers, rows)
+
+        assert "| Name | Age | City |" in result
+        assert "| --- | --- | --- |" in result
+        assert "| Alice | 30 | NYC |" in result
+        assert "| Bob | 25 | LA |" in result
+
+    def test_table_to_markdown_empty_headers(self):
+        """Should handle empty headers."""
+        result = XLSExtractor._table_to_markdown([], [])
+        assert result == ""
+
+    def test_table_to_markdown_missing_values(self):
+        """Should handle missing values in rows."""
+        headers = ["A", "B"]
+        rows = [{"A": "1"}]  # Missing "B"
+
+        result = XLSExtractor._table_to_markdown(headers, rows)
+
+        assert "| 1 |  |" in result  # Empty value for B
+
+
+class TestXLSExtractorIntegration:
+    """Test XLSExtractor integration with ExtractedData."""
+
+    def test_xls_extractor_error_tracking(self):
+        """XLSExtractor should integrate with error tracking."""
+        data = ExtractedData(config=Config(error_mode='continue', max_errors=5))
+
+        XLSExtractor.extract(data)  # Will fail - no item
+
+        assert len(data.errors.errors) > 0
+        assert data.current_stage == "extraction"

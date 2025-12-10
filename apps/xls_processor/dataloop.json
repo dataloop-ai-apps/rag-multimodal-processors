@@ -1,29 +1,33 @@
 {
-  "displayName": "RAG DOC Processor",
-  "name": "rag-doc-processor",
+  "displayName": "RAG Excel Processor",
+  "name": "rag-xls-processor",
   "scope": "public",
-  "version": "0.1.9",
-  "description": "DOC/DOCX processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports multiple chunking strategies.",
+  "version": "0.1.6",
+  "description": "Excel (XLS/XLSX) processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
     "Provider": "Dataloop",
     "Deployed By": "Dataloop",
     "License": "Apache 2.0",
-    "Application Type": ["Pipeline Node"],
-    "Media Type": ["Document"]
+    "Application Type": [
+      "Pipeline Node"
+    ],
+    "Media Type": [
+      "Document"
+    ]
   },
   "codebase": {
     "type": "git",
     "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
-    "gitTag": "0.1.9"
+    "gitTag": "0.1.6"
   },
   "components": {
     "computeConfigs": [
       {
-        "name": "doc-processor-service",
+        "name": "xls-processor-service",
         "runtime": {
           "podType": "regular-m",
-          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.1",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/xls-processor:0.0.1",
           "concurrency": 25,
           "autoscaler": {
             "minReplicas": 0,
@@ -37,12 +41,12 @@
       {
         "invoke": {
           "type": "function",
-          "namespace": "doc-processor-service.doc-processor-module.run"
+          "namespace": "xls-processor-service.xls-processor-module.run"
         },
-        "name": "doc-processor-node",
+        "name": "xls-processor-node",
         "categories": ["document-processing"],
-        "displayName": "DOC to Chunks",
-        "description": "Process DOC/DOCX documents to extract text, tables, images, apply OCR, and create chunks",
+        "displayName": "Excel to Chunks",
+        "description": "Process Excel (XLS/XLSX) documents to extract text, tables, images, apply OCR, and create chunks",
         "scope": "project",
         "configuration": {
           "fields": [
@@ -52,7 +56,7 @@
               "props": {
                 "title": true,
                 "type": "string",
-                "default": "DOC-to-Chunks",
+                "default": "Excel-to-Chunks",
                 "required": true,
                 "placeholder": "Insert node name",
                 "redAsterisk": true,
@@ -84,7 +88,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Extract images from DOCX and apply OCR to extract text from them"
+                "tooltip": "Extract images from Excel and apply OCR to extract text from them"
               },
               "widget": "dl-checkbox"
             },
@@ -134,7 +138,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Extract DOCX as Markdown for better structure preservation"
+                "tooltip": "Extract Excel as Markdown for better structure preservation"
               },
               "widget": "dl-checkbox"
             },
@@ -262,10 +266,10 @@
     ],
     "modules": [
       {
-        "name": "doc-processor-module",
-        "computeConfig": "doc-processor-service",
-        "entryPoint": "apps/doc_processor/app.py",
-        "className": "DOCProcessor",
+        "name": "xls-processor-module",
+        "computeConfig": "xls-processor-service",
+        "entryPoint": "apps/xls_processor/app.py",
+        "className": "XLSProcessor",
         "initInputs": [],
         "functions": [
           {
@@ -287,7 +291,7 @@
               }
             ],
             "displayIcon": "icon-dl-task",
-            "displayName": "DOC to Chunks"
+            "displayName": "Excel to Chunks"
           }
         ]
       }
