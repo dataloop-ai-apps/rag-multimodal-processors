@@ -1,24 +1,33 @@
 {
-  "displayName": "RAG DOC Processor",
-  "name": "rag-doc-processor",
+  "displayName": "PDF to Chunks",
+  "name": "pdf_to_chunks",
   "scope": "public",
-  "version": "0.1.9",
-  "description": "DOC/DOCX processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports multiple chunking strategies.",
+  "version": "0.0.1",
+  "description": "PDF processing service that extracts text, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
     "Provider": "Dataloop",
     "Deployed By": "Dataloop",
     "License": "Apache 2.0",
-    "Application Type": ["Pipeline Node"],
-    "Media Type": ["Document"]
+    "Application Type": [
+      "Pipeline Node"
+    ],
+    "Media Type": [
+      "Document"
+    ]
+  },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.0"
   },
   "components": {
     "computeConfigs": [
       {
-        "name": "doc-processor-service",
+        "name": "pdf-processor-service",
         "runtime": {
           "podType": "regular-m",
-          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.1",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pdf-processor:0.0.1",
           "concurrency": 25,
           "autoscaler": {
             "minReplicas": 0,
@@ -32,12 +41,14 @@
       {
         "invoke": {
           "type": "function",
-          "namespace": "doc-processor-service.doc-processor-module.run"
+          "namespace": "pdf-processor-service.pdf-processor-module.process_document"
         },
-        "name": "doc-processor-node",
-        "categories": ["document-processing"],
-        "displayName": "DOC to Chunks",
-        "description": "Process DOC/DOCX documents to extract text, tables, images, apply OCR, and create chunks",
+        "name": "process_document",
+        "categories": [
+          "document-processing"
+        ],
+        "displayName": "PDF to Chunks",
+        "description": "Process PDF documents to extract text, apply OCR, and create chunks",
         "scope": "project",
         "configuration": {
           "fields": [
@@ -47,11 +58,9 @@
               "props": {
                 "title": true,
                 "type": "string",
-                "default": "DOC-to-Chunks",
+                "default": "PDF-to-Chunks",
                 "required": true,
-                "placeholder": "Insert node name",
-                "redAsterisk": true,
-                "tooltip": "Unique name for this pipeline node"
+                "placeholder": "Insert node name"
               },
               "rules": [
                 {
@@ -62,24 +71,13 @@
               "widget": "dl-input"
             },
             {
-              "name": "to_correct_spelling",
-              "title": "Apply Text Cleaning",
-              "props": {
-                "type": "boolean",
-                "title": true,
-                "default": false,
-                "tooltip": "Clean and normalize text to fix formatting inconsistencies"
-              },
-              "widget": "dl-checkbox"
-            },
-            {
               "name": "ocr_from_images",
               "title": "Extract Text from Images (OCR)",
               "props": {
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Extract images from DOCX and apply OCR to extract text from them"
+                "description": "Extract images from PDF and apply OCR to extract text from them"
               },
               "widget": "dl-checkbox"
             },
@@ -90,8 +88,6 @@
                 "type": "string",
                 "required": true,
                 "default": "append_to_page",
-                "redAsterisk": true,
-                "tooltip": "How to integrate OCR text with document text",
                 "options": [
                   {
                     "value": "append_to_page",
@@ -113,14 +109,7 @@
                   "effect": "error"
                 }
               ],
-              "widget": "dl-select",
-              "dependsOn": [
-                {
-                  "field": "ocr_from_images",
-                  "value": true,
-                  "operator": "equals"
-                }
-              ]
+              "widget": "dl-select"
             },
             {
               "name": "use_markdown_extraction",
@@ -129,7 +118,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Extract DOCX as Markdown for better structure preservation"
+                "description": "Extract PDF as Markdown for better structure preservation"
               },
               "widget": "dl-checkbox"
             },
@@ -140,8 +129,6 @@
                 "type": "string",
                 "required": true,
                 "default": "recursive",
-                "redAsterisk": true,
-                "tooltip": "Method for splitting text into chunks",
                 "options": [
                   {
                     "value": "fixed-size",
@@ -183,9 +170,7 @@
                 "max": 2000,
                 "step": 50,
                 "title": true,
-                "required": true,
-                "redAsterisk": true,
-                "tooltip": "Maximum number of characters per chunk"
+                "required": true
               },
               "rules": [
                 {
@@ -193,38 +178,19 @@
                   "effect": "error"
                 }
               ],
-              "widget": "dl-slider",
-              "dependsOn": [
-                {
-                  "field": "chunking_strategy",
-                  "value": "1-chunk",
-                  "operator": "notEquals"
-                },
-                {
-                  "field": "chunking_strategy",
-                  "value": "nltk-sentence",
-                  "operator": "notEquals"
-                },
-                {
-                  "field": "chunking_strategy",
-                  "value": "nltk-paragraphs",
-                  "operator": "notEquals"
-                }
-              ]
+              "widget": "dl-slider"
             },
             {
               "name": "chunk_overlap",
               "title": "Chunk Overlap",
               "props": {
                 "type": "number",
-                "default": 40,
+                "default": 50,
                 "min": 0,
                 "max": 400,
                 "step": 10,
                 "title": true,
-                "required": true,
-                "redAsterisk": true,
-                "tooltip": "Number of overlapping characters between consecutive chunks"
+                "required": true
               },
               "rules": [
                 {
@@ -232,24 +198,18 @@
                   "effect": "error"
                 }
               ],
-              "widget": "dl-slider",
-              "dependsOn": [
-                {
-                  "field": "chunking_strategy",
-                  "value": "1-chunk",
-                  "operator": "notEquals"
-                },
-                {
-                  "field": "chunking_strategy",
-                  "value": "nltk-sentence",
-                  "operator": "notEquals"
-                },
-                {
-                  "field": "chunking_strategy",
-                  "value": "nltk-paragraphs",
-                  "operator": "notEquals"
-                }
-              ]
+              "widget": "dl-slider"
+            },
+            {
+              "name": "to_correct_spelling",
+              "title": "Apply Text Cleaning",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "description": "Apply text cleaning and normalization to fix OCR errors and inconsistent formatting"
+              },
+              "widget": "dl-checkbox"
             }
           ]
         }
@@ -257,14 +217,14 @@
     ],
     "modules": [
       {
-        "name": "doc-processor-module",
-        "computeConfig": "doc-processor-service",
-        "entryPoint": "apps/doc_processor/app.py",
-        "className": "DOCProcessor",
+        "name": "pdf-processor-module",
+        "computeConfig": "pdf-processor-service",
+        "entryPoint": "apps/pdf-processor/pdf_processor.py",
+        "className": "PDFProcessor",
         "initInputs": [],
         "functions": [
           {
-            "name": "run",
+            "name": "process_document",
             "input": [
               {
                 "type": "Item",
@@ -281,11 +241,12 @@
                 "name": "items"
               }
             ],
-            "displayIcon": "icon-dl-task",
-            "displayName": "DOC to Chunks"
+            "displayIcon": "icon-dl-pdf",
+            "displayName": "PDF to Chunks"
           }
         ]
       }
     ]
   }
 }
+
