@@ -19,7 +19,7 @@
   "codebase": {
     "type": "git",
     "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
-    "gitTag": "0.1.6"
+    "gitTag": "0.1.9"
   },
   "components": {
     "computeConfigs": [
@@ -27,7 +27,7 @@
         "name": "xls-processor-service",
         "runtime": {
           "podType": "regular-m",
-          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/xls-processor:0.0.2",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/xls-processor:0.0.3",
           "concurrency": 25,
           "autoscaler": {
             "minReplicas": 0,
