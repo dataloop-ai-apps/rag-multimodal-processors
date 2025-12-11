@@ -2,7 +2,7 @@
   "displayName": "RAG Excel Processor",
   "name": "rag-xls-processor",
   "scope": "public",
-  "version": "0.1.6",
+  "version": "0.1.9",
   "description": "Excel (XLS/XLSX) processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
