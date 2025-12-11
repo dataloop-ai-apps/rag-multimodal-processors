@@ -250,19 +250,25 @@ class XLSExtractor:
             with pd.ExcelFile(file_path, engine='openpyxl') as excel_file:
                 for sheet_index, sheet_name in enumerate(excel_file.sheet_names):
                     try:
-                        df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                        # Read without headers first to check if first row is actually a header
+                        df_no_header = pd.read_excel(excel_file, sheet_name=sheet_name, header=None)
                         
-                        if df.empty:
+                        if df_no_header.empty:
                             continue
                         
-                        # Determine headers
-                        if XLSExtractor._looks_like_header(df.iloc[0]):
+                        # Check if first row looks like a header
+                        if XLSExtractor._looks_like_header(df_no_header.iloc[0]):
+                            # First row is header, use it and skip it from data
                             headers = [str(val) if pd.notna(val) else f"Column {i+1}" 
-                                      for i, val in enumerate(df.iloc[0])]
-                            data_df = df.iloc[1:].reset_index(drop=True)
+                                      for i, val in enumerate(df_no_header.iloc[0])]
+                            data_df = df_no_header.iloc[1:].reset_index(drop=True)
+                            # Set column names to indices for easier access
+                            data_df.columns = range(len(headers))
                         else:
-                            headers = [f"Column {i+1}" for i in range(len(df.columns))]
-                            data_df = df
+                            # First row is data, use generic column names
+                            headers = [f"Column {i+1}" for i in range(len(df_no_header.columns))]
+                            data_df = df_no_header.reset_index(drop=True)
+                            data_df.columns = range(len(headers))
                         
                         # Convert to list of dictionaries
                         rows = []
