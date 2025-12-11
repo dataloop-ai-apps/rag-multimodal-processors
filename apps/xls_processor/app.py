@@ -13,7 +13,7 @@ import nltk
 import transforms
 from utils.extracted_data import ExtractedData
 from utils.config import Config
-from .xls_extractor import XLSExtractor
+from apps.xls_processor.xls_extractor import XLSExtractor
 
 logger = logging.getLogger("rag-preprocessor")
 
