@@ -37,13 +37,19 @@ class XLSExtractor:
             return data
 
         try:
-            with tempfile.TemporaryDirectory() as temp_dir:
+            import shutil
+            
+            # Create persistent temp directory for file download for OCR processing
+            temp_dir = tempfile.mkdtemp(prefix='xls_extract_')
+            image_dir = tempfile.mkdtemp(prefix='xls_images_')
+
+            try:
                 file_path = data.item.download(local_path=temp_dir)
                 use_markdown = data.config.use_markdown_extraction
 
                 # Extract images if configured
                 if data.config.extract_images:
-                    data.images = XLSExtractor._extract_images(file_path, temp_dir)
+                    data.images = XLSExtractor._extract_images(file_path, image_dir)
 
                 # Extract tables if configured
                 if data.config.extract_tables:
@@ -64,6 +70,13 @@ class XLSExtractor:
                     'table_count': len(data.tables),
                     'processor': 'xls',
                 }
+            finally:
+                # Clean up temp_dir (file download location)
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception:
+                    logger.warning(f"Error cleaning up temp directory: {e}")
+                    pass
 
         except Exception as e:
             data.log_error("Excel extraction failed. Check logs for details.")
