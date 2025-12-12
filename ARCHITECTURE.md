@@ -14,6 +14,7 @@ Each file type is a self-contained processor that follows a consistent pipeline 
 
 - **PDF** (.pdf) - `PDFProcessor` with `PDFExtractor`
 - **DOC** (.docx) - `DOCProcessor` with `DOCExtractor`
+- **Excel** (.xls, .xlsx) - `XLSProcessor` with `XLSExtractor`
 
 ## Core Data Structure: ExtractedData
 
@@ -64,10 +65,16 @@ apps/
 │   ├── pdf_extractor.py    # PDFExtractor - extraction logic
 │   ├── dataloop.json
 │   └── Dockerfile
-└── doc_processor/
+├── doc_processor/
+│   ├── __init__.py
+│   ├── app.py              # DOCProcessor class
+│   ├── doc_extractor.py    # DOCExtractor - extraction logic
+│   ├── dataloop.json
+│   └── Dockerfile
+└── xls_processor/
     ├── __init__.py
-    ├── app.py              # DOCProcessor class
-    ├── doc_extractor.py    # DOCExtractor - extraction logic
+    ├── app.py              # XLSProcessor class
+    ├── xls_extractor.py    # XLSExtractor - extraction logic
     ├── dataloop.json
     └── Dockerfile
 ```
@@ -299,6 +306,7 @@ class XLSProcessor(dl.BaseServiceRunner):
 3. **Register** in `main.py`:
 ```python
 APP_REGISTRY['application/vnd.ms-excel'] = XLSProcessor
+APP_REGISTRY['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] = XLSProcessor
 ```
 
 ### Adding a New Transform
@@ -334,9 +342,9 @@ pytest tests/test_processors.py -v
 | Test File | Coverage |
 |-----------|----------|
 | `test_core.py` | Config, ErrorTracker, ExtractedData, ChunkMetadata |
-| `test_extractors.py` | PDFExtractor, DOCExtractor |
+| `test_extractors.py` | PDFExtractor, DOCExtractor, XLSExtractor |
 | `test_transforms.py` | All transform functions |
-| `test_processors.py` | Integration tests (PDF, DOC) |
+| `test_processors.py` | Integration tests (PDF, DOC, XLS) |
 
 ## Design Principles
 
