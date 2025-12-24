@@ -1,0 +1,17 @@
+# Core Dataloop SDK
+dtlpy>=1.0.0
+
+# Data Processing
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# Image Processing
+Pillow>=10.0.0
+
+# PDF Processing (required by unstructured)
+PyMuPDF>=1.23.0  # Provides 'fitz' module
+
+# Text Processing
+unstructured>=0.10.0
+nltk>=3.8.0
+langchain-text-splitters>=0.0.1

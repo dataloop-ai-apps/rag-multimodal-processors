@@ -1,16 +1,20 @@
 {
-  "displayName": "RAG PDF Processor",
-  "name": "rag-pdf-processor",
+  "displayName": "RAG Excel Processor",
+  "name": "rag-xls-processor",
   "scope": "public",
   "version": "0.1.10",
-  "description": "PDF processing service that extracts text, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
+  "description": "Excel (XLS/XLSX) processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
     "Provider": "Dataloop",
     "Deployed By": "Dataloop",
     "License": "Apache 2.0",
-    "Application Type": ["Pipeline Node"],
-    "Media Type": ["Document"]
+    "Application Type": [
+      "Pipeline Node"
+    ],
+    "Media Type": [
+      "Document"
+    ]
   },
   "codebase": {
     "type": "git",
@@ -20,10 +24,10 @@
   "components": {
     "computeConfigs": [
       {
-        "name": "pdf-processor-service",
+        "name": "xls-processor-service",
         "runtime": {
           "podType": "regular-m",
-          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pdf-processor:0.0.3",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/xls-processor:0.0.4",
           "concurrency": 25,
           "autoscaler": {
             "minReplicas": 0,
@@ -37,12 +41,12 @@
       {
         "invoke": {
           "type": "function",
-          "namespace": "pdf-processor-service.pdf-processor-module.run"
+          "namespace": "xls-processor-service.xls-processor-module.run"
         },
-        "name": "pdf-processor-node",
+        "name": "xls-processor-node",
         "categories": ["document-processing"],
-        "displayName": "PDF to Chunks",
-        "description": "Process PDF documents to extract text, apply OCR, and create chunks",
+        "displayName": "Excel to Chunks",
+        "description": "Process Excel (XLS/XLSX) documents to extract text, tables, images, apply OCR, and create chunks",
         "scope": "project",
         "configuration": {
           "fields": [
@@ -52,7 +56,7 @@
               "props": {
                 "title": true,
                 "type": "string",
-                "default": "PDF-to-Chunks",
+                "default": "Excel-to-Chunks",
                 "required": true,
                 "placeholder": "Insert node name",
                 "redAsterisk": true,
@@ -73,7 +77,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Clean and normalize text to fix OCR errors and inconsistent formatting"
+                "tooltip": "Clean and normalize text to fix formatting inconsistencies"
               },
               "widget": "dl-checkbox"
             },
@@ -84,7 +88,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Extract images from PDF and apply OCR to extract text from them"
+                "tooltip": "Extract images from Excel and apply OCR to extract text from them"
               },
               "widget": "dl-checkbox"
             },
@@ -96,7 +100,7 @@
                 "required": true,
                 "default": "append_to_page",
                 "redAsterisk": true,
-                "tooltip": "How to integrate OCR text: append to page, create separate chunks, or combine all",
+                "tooltip": "How to integrate OCR text with document text",
                 "options": [
                   {
                     "value": "append_to_page",
@@ -134,7 +138,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Extract PDF as Markdown to preserve document structure and formatting"
+                "tooltip": "Extract Excel as Markdown for better structure preservation"
               },
               "widget": "dl-checkbox"
             },
@@ -262,10 +266,10 @@
     ],
     "modules": [
       {
-        "name": "pdf-processor-module",
-        "computeConfig": "pdf-processor-service",
-        "entryPoint": "apps/pdf_processor/app.py",
-        "className": "PDFProcessor",
+        "name": "xls-processor-module",
+        "computeConfig": "xls-processor-service",
+        "entryPoint": "apps/xls_processor/app.py",
+        "className": "XLSProcessor",
         "initInputs": [],
         "functions": [
           {
@@ -286,8 +290,8 @@
                 "name": "items"
               }
             ],
-            "displayIcon": "icon-dl-pdf",
-            "displayName": "PDF to Chunks"
+            "displayIcon": "icon-dl-task",
+            "displayName": "Excel to Chunks"
           }
         ]
       }
