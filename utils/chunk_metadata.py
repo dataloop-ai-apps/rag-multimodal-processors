@@ -56,6 +56,7 @@ class ChunkMetadata:
         """
         base_metadata = {
             'source_item_id': self.source_item_id,
+            'original_item_id': self.source_item_id,  # alias for contextual_chunks compatibility
             'source_file': self.source_file,
             'source_dataset_id': self.source_dataset_id,
             'chunk_index': self.chunk_index,
