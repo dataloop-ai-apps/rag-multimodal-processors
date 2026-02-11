@@ -2,7 +2,7 @@
   "displayName": "RAG Excel Processor",
   "name": "rag-xls-processor",
   "scope": "public",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Excel (XLS/XLSX) processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
   "attributes": {
     "Category": "Application",
@@ -19,7 +19,7 @@
   "codebase": {
     "type": "git",
     "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
-    "gitTag": "0.1.11"
+    "gitTag": "0.1.12"
   },
   "components": {
     "computeConfigs": [
