@@ -65,9 +65,9 @@ class DOCExtractor:
                     'processor': 'doc',
                 }
 
-        except Exception as e:
+        except Exception:
             data.log_error("Document extraction failed. Check logs for details.")
-            logger.exception(f"DOCX extraction error: {e}")
+            logger.exception("DOCX extraction error")
 
         return data
 
@@ -203,8 +203,8 @@ class DOCExtractor:
                 size = DOCExtractor._get_image_size(blob)
 
                 images.append(ImageContent(path=image_path, format=ext, size=size))
-            except (IOError, OSError, ValueError, KeyError) as e:
-                logger.warning(f"Failed to extract image {img_index} from DOCX: {e}")
+            except (IOError, OSError, ValueError, KeyError):
+                logger.warning("Failed to extract image %d from DOCX", img_index)
 
         return images
 
@@ -244,8 +244,8 @@ class DOCExtractor:
 
                 markdown = DOCExtractor._table_to_markdown(headers, rows)
                 tables.append(TableContent(data=rows, markdown=markdown))
-            except (ValueError, AttributeError, IndexError) as e:
-                logger.warning(f"Failed to extract table {table_index}: {e}")
+            except (ValueError, AttributeError, IndexError):
+                logger.warning("Failed to extract table %d", table_index)
 
         return tables
 
