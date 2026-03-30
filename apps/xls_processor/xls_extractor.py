@@ -10,6 +10,7 @@ Handles Excel-specific extraction operations:
 import logging
 import os
 import tempfile
+import zipfile
 from typing import List, Dict, Tuple, Optional, Any
 
 import pandas as pd
@@ -71,16 +72,14 @@ class XLSExtractor:
                     'processor': 'xls',
                 }
             finally:
-                # Clean up temp_dir (file download location)
                 try:
                     shutil.rmtree(temp_dir, ignore_errors=True)
-                except Exception:
-                    logger.warning(f"Error cleaning up temp directory: {e}")
-                    pass
+                except OSError:
+                    logger.warning("Failed to clean up temp directory", exc_info=True)
 
-        except Exception as e:
+        except Exception:
             data.log_error("Excel extraction failed. Check logs for details.")
-            logger.exception(f"Excel extraction error: {e}")
+            logger.exception("Excel extraction error")
 
         return data
 
@@ -105,8 +104,8 @@ class XLSExtractor:
                         if row_text.strip():
                             text_parts.append(row_text)
                 
-        except Exception as e:
-            logger.warning(f"Error extracting plain text from Excel: {e}")
+        except (ValueError, KeyError, OSError, zipfile.BadZipFile):
+            logger.warning("Error extracting plain text from Excel", exc_info=True)
             return ""
 
         return '\n'.join(text_parts)
@@ -146,8 +145,8 @@ class XLSExtractor:
                         md_parts.append(current_table.markdown)
                         current_table = next(table_iter, None)
 
-        except Exception as e:
-            logger.warning(f"Error extracting markdown from Excel: {e}")
+        except (ValueError, KeyError, OSError, zipfile.BadZipFile):
+            logger.warning("Error extracting markdown from Excel", exc_info=True)
 
         return '\n\n'.join(md_parts)
 
@@ -205,7 +204,7 @@ class XLSExtractor:
                                 image_data = img._data()
                             elif hasattr(img, 'ref'):
                                 # Alternative: try to get from anchor if available
-                                logger.warning(f"Image {img_index} in sheet {sheet_name} has no _data() method")
+                                logger.warning("Image %d in sheet has no _data() method", img_index)
                                 continue
                             else:
                                 continue
@@ -237,11 +236,11 @@ class XLSExtractor:
                                     caption=f"Image from sheet: {sheet_name}"
                                 )
                             )
-                        except (IOError, OSError, ValueError, KeyError, AttributeError) as e:
-                            logger.warning(f"Failed to extract image {img_index} from sheet {sheet_name}: {e}")
+                        except (IOError, OSError, ValueError, KeyError, AttributeError):
+                            logger.warning("Failed to extract image %d from sheet", img_index, exc_info=True)
 
-        except Exception as e:
-            logger.warning(f"Error extracting images from Excel: {e}")
+        except (IOError, OSError, ValueError, KeyError, AttributeError, zipfile.BadZipFile):
+            logger.warning("Error extracting images from Excel", exc_info=True)
 
         return images
 
@@ -305,11 +304,11 @@ class XLSExtractor:
                                 page_number=sheet_index + 1
                             )
                         )
-                    except (ValueError, AttributeError, IndexError) as e:
-                        logger.warning(f"Failed to extract table from sheet {sheet_name}: {e}")
+                    except (ValueError, AttributeError, IndexError):
+                        logger.warning("Failed to extract table from sheet %d", sheet_index, exc_info=True)
 
-        except Exception as e:
-            logger.warning(f"Error extracting tables from Excel: {e}")
+        except (ValueError, AttributeError, IndexError, OSError, zipfile.BadZipFile):
+            logger.warning("Error extracting tables from Excel", exc_info=True)
 
         return tables
 

@@ -53,6 +53,6 @@ class XLSProcessor(dl.BaseServiceRunner):
             logger.info(f"Processed {item.name}: {len(data.uploaded_items)} chunks, {data.errors.get_summary()}")
             return data.uploaded_items
 
-        except Exception as e:
-            logger.error(f"Processing failed: {e}", exc_info=True)
+        except Exception:
+            logger.error("Processing failed", exc_info=True)
             raise

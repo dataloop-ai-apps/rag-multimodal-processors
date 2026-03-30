@@ -50,9 +50,9 @@ class PDFExtractor:
                 metadata['source_file'] = data.item_name
                 data.metadata = metadata
 
-        except Exception as e:
+        except Exception:
             data.log_error("PDF extraction failed. Check logs for details.")
-            logger.exception(f"PDF extraction error: {e}")
+            logger.exception("PDF extraction error")
 
         return data
 
@@ -143,7 +143,7 @@ class PDFExtractor:
                         bbox=bbox,
                     )
                 )
-            except (IOError, OSError, ValueError, KeyError) as e:
-                logger.warning(f"Failed to extract image {img_index} from page {page_num}: {e}")
+            except (IOError, OSError, ValueError, KeyError):
+                logger.warning("Failed to extract image %d from page %d", img_index, page_num, exc_info=True)
 
         return images

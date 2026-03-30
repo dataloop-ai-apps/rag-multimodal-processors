@@ -77,8 +77,8 @@ class TextNormalizer:
 
             return element.text
 
-        except Exception as e:
-            logger.warning(f"Deep cleaning failed: {str(e)}, returning original text")
+        except Exception:
+            logger.warning("Deep cleaning failed, returning original text", exc_info=True)
             return text
 
 
