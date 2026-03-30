@@ -100,7 +100,7 @@ class ChunkUploader:
             logger.info(f"Bulk upload successful | uploaded_count={len(uploaded_items)}")
 
         except Exception:
-            logger.warning("Bulk upload failed. Falling back to individual uploads...")
+            logger.warning("Bulk upload failed. Falling back to individual uploads...", exc_info=True)
             uploaded_items = ChunkUploader._fallback_individual_upload(
                 upload_data, target_dataset, len(chunks)
             )
@@ -145,7 +145,7 @@ class ChunkUploader:
                     failed_uploads.append(idx)
 
             except Exception:
-                logger.error("Failed to upload chunk %d", idx)
+                logger.error("Failed to upload chunk %d", idx, exc_info=True)
                 failed_uploads.append(idx)
 
         if failed_uploads:

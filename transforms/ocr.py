@@ -64,7 +64,7 @@ class OCREnhancer:
                             ocr_by_page[page_num] = []
                         ocr_by_page[page_num].append(ocr_text)
                 except Exception as e:
-                    logger.warning("OCR failed for image: %s", type(e).__name__)
+                    logger.warning("OCR failed for image", exc_info=True)
                     ocr_errors[img.path] = type(e).__name__
 
         return ocr_by_page, ocr_errors
@@ -184,7 +184,7 @@ class OCREnhancer:
 
         except Exception as e:
             error_message = f"EasyOCR failed: {type(e).__name__}"
-            logger.error(error_message)
+            logger.error(error_message, exc_info=True)
             return "", error_message
 
 

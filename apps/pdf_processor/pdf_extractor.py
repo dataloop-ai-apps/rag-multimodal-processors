@@ -144,6 +144,6 @@ class PDFExtractor:
                     )
                 )
             except (IOError, OSError, ValueError, KeyError):
-                logger.warning("Failed to extract image %d from page %d", img_index, page_num)
+                logger.warning("Failed to extract image %d from page %d", img_index, page_num, exc_info=True)
 
         return images

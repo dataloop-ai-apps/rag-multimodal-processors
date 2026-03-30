@@ -204,7 +204,7 @@ class DOCExtractor:
 
                 images.append(ImageContent(path=image_path, format=ext, size=size))
             except (IOError, OSError, ValueError, KeyError):
-                logger.warning("Failed to extract image %d from DOCX", img_index)
+                logger.warning("Failed to extract image %d from DOCX", img_index, exc_info=True)
 
         return images
 
@@ -245,7 +245,7 @@ class DOCExtractor:
                 markdown = DOCExtractor._table_to_markdown(headers, rows)
                 tables.append(TableContent(data=rows, markdown=markdown))
             except (ValueError, AttributeError, IndexError):
-                logger.warning("Failed to extract table %d", table_index)
+                logger.warning("Failed to extract table %d", table_index, exc_info=True)
 
         return tables
 

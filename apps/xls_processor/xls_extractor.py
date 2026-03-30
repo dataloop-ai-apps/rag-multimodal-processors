@@ -74,7 +74,7 @@ class XLSExtractor:
                 try:
                     shutil.rmtree(temp_dir, ignore_errors=True)
                 except OSError:
-                    logger.warning("Failed to clean up temp directory")
+                    logger.warning("Failed to clean up temp directory", exc_info=True)
 
         except Exception:
             data.log_error("Excel extraction failed. Check logs for details.")
@@ -103,8 +103,8 @@ class XLSExtractor:
                         if row_text.strip():
                             text_parts.append(row_text)
                 
-        except (ValueError, KeyError, OSError) as e:
-            logger.warning("Error extracting plain text from Excel: %s", type(e).__name__)
+        except (ValueError, KeyError, OSError):
+            logger.warning("Error extracting plain text from Excel", exc_info=True)
             return ""
 
         return '\n'.join(text_parts)
@@ -144,8 +144,8 @@ class XLSExtractor:
                         md_parts.append(current_table.markdown)
                         current_table = next(table_iter, None)
 
-        except (ValueError, KeyError, OSError) as e:
-            logger.warning("Error extracting markdown from Excel: %s", type(e).__name__)
+        except (ValueError, KeyError, OSError):
+            logger.warning("Error extracting markdown from Excel", exc_info=True)
 
         return '\n\n'.join(md_parts)
 
@@ -236,10 +236,10 @@ class XLSExtractor:
                                 )
                             )
                         except (IOError, OSError, ValueError, KeyError, AttributeError):
-                            logger.warning("Failed to extract image %d from sheet", img_index)
+                            logger.warning("Failed to extract image %d from sheet", img_index, exc_info=True)
 
-        except (IOError, OSError, ValueError, KeyError, AttributeError) as e:
-            logger.warning("Error extracting images from Excel: %s", type(e).__name__)
+        except (IOError, OSError, ValueError, KeyError, AttributeError):
+            logger.warning("Error extracting images from Excel", exc_info=True)
 
         return images
 
@@ -304,10 +304,10 @@ class XLSExtractor:
                             )
                         )
                     except (ValueError, AttributeError, IndexError):
-                        logger.warning("Failed to extract table from sheet %d", sheet_index)
+                        logger.warning("Failed to extract table from sheet %d", sheet_index, exc_info=True)
 
-        except (ValueError, AttributeError, IndexError, OSError) as e:
-            logger.warning("Error extracting tables from Excel: %s", type(e).__name__)
+        except (ValueError, AttributeError, IndexError, OSError):
+            logger.warning("Error extracting tables from Excel", exc_info=True)
 
         return tables
 
