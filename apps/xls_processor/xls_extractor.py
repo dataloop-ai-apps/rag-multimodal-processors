@@ -10,6 +10,7 @@ Handles Excel-specific extraction operations:
 import logging
 import os
 import tempfile
+import zipfile
 from typing import List, Dict, Tuple, Optional, Any
 
 import pandas as pd
@@ -103,7 +104,7 @@ class XLSExtractor:
                         if row_text.strip():
                             text_parts.append(row_text)
                 
-        except (ValueError, KeyError, OSError):
+        except (ValueError, KeyError, OSError, zipfile.BadZipFile):
             logger.warning("Error extracting plain text from Excel", exc_info=True)
             return ""
 
@@ -144,7 +145,7 @@ class XLSExtractor:
                         md_parts.append(current_table.markdown)
                         current_table = next(table_iter, None)
 
-        except (ValueError, KeyError, OSError):
+        except (ValueError, KeyError, OSError, zipfile.BadZipFile):
             logger.warning("Error extracting markdown from Excel", exc_info=True)
 
         return '\n\n'.join(md_parts)
@@ -238,7 +239,7 @@ class XLSExtractor:
                         except (IOError, OSError, ValueError, KeyError, AttributeError):
                             logger.warning("Failed to extract image %d from sheet", img_index, exc_info=True)
 
-        except (IOError, OSError, ValueError, KeyError, AttributeError):
+        except (IOError, OSError, ValueError, KeyError, AttributeError, zipfile.BadZipFile):
             logger.warning("Error extracting images from Excel", exc_info=True)
 
         return images
@@ -306,7 +307,7 @@ class XLSExtractor:
                     except (ValueError, AttributeError, IndexError):
                         logger.warning("Failed to extract table from sheet %d", sheet_index, exc_info=True)
 
-        except (ValueError, AttributeError, IndexError, OSError):
+        except (ValueError, AttributeError, IndexError, OSError, zipfile.BadZipFile):
             logger.warning("Error extracting tables from Excel", exc_info=True)
 
         return tables
