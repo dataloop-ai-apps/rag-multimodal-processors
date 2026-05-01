@@ -1,11 +1,12 @@
 # RAG Document Processors
 
-Modular, extensible processors for converting **PDF and DOC files** into RAG-ready chunks. Built on Dataloop with a type-safe pipeline architecture using `ExtractedData` dataclass.
+Modular, extensible processors for converting **PDF, DOC, and PPTX files** into RAG-ready chunks. Built on Dataloop with a type-safe pipeline architecture using `ExtractedData` dataclass.
 
 ## Supported File Types
 
 - **PDF** (.pdf) - ML-enhanced text extraction with PyMuPDF Layout, optional OCR
 - **Microsoft Word** (.docx) - Document processing with tables and images
+- **PowerPoint** (.pptx) - Slide text, speaker notes, tables, and image extraction
 
 ## Key Features
 
@@ -25,6 +26,7 @@ Modular, extensible processors for converting **PDF and DOC files** into RAG-rea
 import dtlpy as dl
 from apps.pdf_processor.app import PDFProcessor
 from apps.doc_processor.app import DOCProcessor
+from apps.pptx_processor.app import PPTXProcessor
 
 # Get items
 item = dl.items.get(item_id='your-item-id')
@@ -39,6 +41,14 @@ chunks = PDFProcessor.run(item, dataset, {'use_ocr': True, 'max_chunk_size': 500
 
 # Process DOCX
 chunks = DOCProcessor.run(item, dataset, {'max_chunk_size': 1000})
+
+# Process PPTX
+chunks = PPTXProcessor.run(item, dataset, {
+    'extract_images': True,
+    'extract_tables': True,
+    'extract_notes': True,
+    'max_chunk_size': 500
+})
 ```
 
 ## Processing Options
@@ -176,9 +186,12 @@ apps/                       # File-type processors
 ├── pdf_processor/
 │   ├── app.py             # PDFProcessor class
 │   └── pdf_extractor.py   # PDF extraction logic
-└── doc_processor/
-    ├── app.py             # DOCProcessor class
-    └── doc_extractor.py   # DOCX extraction logic
+├── doc_processor/
+│   ├── app.py             # DOCProcessor class
+│   └── doc_extractor.py   # DOCX extraction logic
+└── pptx_processor/
+    ├── app.py             # PPTXProcessor class
+    └── pptx_extractor.py  # PPTX extraction logic (slides, notes, tables, images)
 
 transforms/                 # Pipeline transforms: (ExtractedData) -> ExtractedData
 ├── text_normalization.py  # clean(), normalize_whitespace(), deep_clean()
@@ -249,13 +262,14 @@ pytest tests/test_processors.py -v
 # Run specific processor
 pytest tests/test_processors.py -k pdf -v
 pytest tests/test_processors.py -k doc -v
+pytest tests/test_processors.py -k pptx -v
 ```
 
 Test files:
 - `test_core.py` - Config, ErrorTracker, ExtractedData, ChunkMetadata
-- `test_extractors.py` - PDFExtractor, DOCExtractor
+- `test_extractors.py` - PDFExtractor, DOCExtractor, PPTXExtractor
 - `test_transforms.py` - Transform functions
-- `test_processors.py` - Integration tests (PDF, DOC)
+- `test_processors.py` - Integration tests (PDF, DOC, PPTX)
 
 ## Adding New File Types
 

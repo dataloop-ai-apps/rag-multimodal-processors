@@ -1,12 +1,13 @@
 """
-Integration tests for PDF and DOC processors.
+Integration tests for PDF, DOC, and PPTX processors.
 
 Usage:
     pytest tests/test_processors.py -v
     pytest tests/test_processors.py -k pdf
     pytest tests/test_processors.py -k doc
+    pytest tests/test_processors.py -k pptx
 
-Edit TEST_ITEMS, PDF_CONFIG, and DOC_CONFIG in tests/test_config.py.
+Edit TEST_ITEMS, PDF_CONFIG, DOC_CONFIG, and PPTX_CONFIG in tests/test_config.py.
 """
 
 import sys
@@ -18,7 +19,8 @@ import dtlpy as dl
 
 from apps.pdf_processor.app import PDFProcessor
 from apps.doc_processor.app import DOCProcessor
-from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, PDF_CONFIG, DOC_CONFIG
+from apps.pptx_processor.app import PPTXProcessor
+from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, PDF_CONFIG, DOC_CONFIG, PPTX_CONFIG
 
 
 # Processor registry for parameterized tests
@@ -33,6 +35,11 @@ PROCESSORS = {
         'config': DOC_CONFIG,
         'label': 'DOC/DOCX',
     },
+    'pptx': {
+        'class': PPTXProcessor,
+        'config': PPTX_CONFIG,
+        'label': 'PPTX',
+    },
 }
 
 
@@ -44,7 +51,7 @@ def _create_mock_context(config: dict) -> dl.Context:
     return context
 
 
-@pytest.mark.parametrize("file_type", ['pdf', 'doc'])
+@pytest.mark.parametrize("file_type", ['pdf', 'doc', 'pptx'])
 def test_processor(file_type):
     """
     Test processor with a Dataloop item.

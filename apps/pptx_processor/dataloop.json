@@ -1,0 +1,257 @@
+{
+  "displayName": "RAG PPTX Processor",
+  "name": "rag-pptx-processor",
+  "scope": "public",
+  "version": "0.1.0",
+  "description": "PowerPoint processing service that extracts text, images, tables, and speaker notes to create chunks for RAG pipelines.",
+  "attributes": {
+    "Category": "Application",
+    "Provider": "Dataloop",
+    "Deployed By": "Dataloop",
+    "License": "Apache 2.0",
+    "Application Type": ["Pipeline Node"],
+    "Media Type": ["Document"]
+  },
+  "codebase": {
+    "type": "git",
+    "gitUrl": "https://github.com/dataloop-ai-apps/rag-multimodal-processors.git",
+    "gitTag": "0.1.0"
+  },
+  "components": {
+    "computeConfigs": [
+      {
+        "name": "pptx-processor-service",
+        "runtime": {
+          "podType": "regular-m",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pptx-processor:0.0.1",
+          "concurrency": 25,
+          "autoscaler": {
+            "minReplicas": 0,
+            "maxReplicas": 10,
+            "queueLength": 100
+          }
+        }
+      }
+    ],
+    "pipelineNodes": [
+      {
+        "invoke": {
+          "type": "function",
+          "namespace": "pptx-processor-service.pptx-processor-module.run"
+        },
+        "name": "pptx-processor-node",
+        "categories": ["document-processing"],
+        "displayName": "PPTX to Chunks",
+        "description": "Process PowerPoint files to extract text, images, tables, and speaker notes and create chunks",
+        "scope": "project",
+        "configuration": {
+          "fields": [
+            {
+              "name": "name",
+              "title": "Node Name",
+              "props": {
+                "title": true,
+                "type": "string",
+                "default": "PPTX-to-Chunks",
+                "required": true,
+                "placeholder": "Insert node name",
+                "redAsterisk": true,
+                "tooltip": "Unique name for this pipeline node"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-input"
+            },
+            {
+              "name": "extract_images",
+              "title": "Extract Images",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": true,
+                "tooltip": "Extract images embedded in the PowerPoint slides"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "extract_tables",
+              "title": "Extract Tables",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": true,
+                "tooltip": "Extract tables from slides as formatted text"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "to_correct_spelling",
+              "title": "Apply Text Cleaning",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "tooltip": "Clean and normalize text to fix inconsistent formatting"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "chunking_strategy",
+              "title": "Chunking Strategy",
+              "props": {
+                "type": "string",
+                "required": true,
+                "default": "recursive",
+                "redAsterisk": true,
+                "tooltip": "Method for splitting text into chunks",
+                "options": [
+                  {
+                    "value": "fixed-size",
+                    "label": "Fixed Size"
+                  },
+                  {
+                    "value": "recursive",
+                    "label": "Recursive"
+                  },
+                  {
+                    "value": "nltk-sentence",
+                    "label": "NLTK Sentence"
+                  },
+                  {
+                    "value": "nltk-paragraphs",
+                    "label": "NLTK Paragraphs"
+                  },
+                  {
+                    "value": "1-chunk",
+                    "label": "Single Chunk"
+                  }
+                ]
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-select"
+            },
+            {
+              "name": "max_chunk_size",
+              "title": "Max Chunk Size",
+              "props": {
+                "type": "number",
+                "default": 300,
+                "min": 1,
+                "max": 2000,
+                "step": 50,
+                "title": true,
+                "required": true,
+                "redAsterisk": true,
+                "tooltip": "Maximum number of characters per chunk"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider",
+              "dependsOn": [
+                {
+                  "field": "chunking_strategy",
+                  "value": "1-chunk",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-sentence",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-paragraphs",
+                  "operator": "notEquals"
+                }
+              ]
+            },
+            {
+              "name": "chunk_overlap",
+              "title": "Chunk Overlap",
+              "props": {
+                "type": "number",
+                "default": 40,
+                "min": 0,
+                "max": 400,
+                "step": 10,
+                "title": true,
+                "required": true,
+                "redAsterisk": true,
+                "tooltip": "Number of overlapping characters between consecutive chunks"
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-slider",
+              "dependsOn": [
+                {
+                  "field": "chunking_strategy",
+                  "value": "1-chunk",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-sentence",
+                  "operator": "notEquals"
+                },
+                {
+                  "field": "chunking_strategy",
+                  "value": "nltk-paragraphs",
+                  "operator": "notEquals"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "modules": [
+      {
+        "name": "pptx-processor-module",
+        "computeConfig": "pptx-processor-service",
+        "entryPoint": "apps/pptx_processor/app.py",
+        "className": "PPTXProcessor",
+        "initInputs": [],
+        "functions": [
+          {
+            "name": "run",
+            "input": [
+              {
+                "type": "Item",
+                "name": "item"
+              },
+              {
+                "type": "Dataset",
+                "name": "target_dataset"
+              }
+            ],
+            "output": [
+              {
+                "type": "Item[]",
+                "name": "items"
+              }
+            ],
+            "displayIcon": "icon-dl-presentation",
+            "displayName": "PPTX to Chunks"
+          }
+        ]
+      }
+    ]
+  }
+}
