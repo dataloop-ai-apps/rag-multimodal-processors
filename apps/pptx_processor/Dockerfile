@@ -5,7 +5,8 @@ RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
     python-pptx>=0.6.21 \
     unstructured>=0.10.0 \
     nltk>=3.8.0 \
-    langchain-text-splitters>=0.0.1
+    langchain-text-splitters>=0.0.1 \
+    easyocr>=1.7.0
 
 # docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pptx-processor:0.0.1 -f apps/pptx_processor/Dockerfile .
 # docker push gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/pptx-processor:0.0.1
