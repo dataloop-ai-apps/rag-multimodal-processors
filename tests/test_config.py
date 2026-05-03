@@ -9,12 +9,13 @@ Edit the values below to configure your test runs.
 # ============================================================
 # Test items (source dataset is obtained from item.dataset)
 TEST_ITEMS = {
-    'pdf': {'item_id': "6911a710d4c1299c6780c14f"},
-    'doc': {'item_id': "6910ba43732d419b5d98b41c"},
+    'pdf': {'item_id': "69f0dd3364b5f2de3f19cb5b"},
+    'doc': {'item_id': "69f0dd42c56bbd3672dc6767"},
+    'pptx': {'item_id': "69f32d5a700e6fd65d1c6fec"}, 
 }
 
 # Target dataset where chunks will be uploaded (REQUIRED)
-TARGET_DATASET_ID = "6910ba261a0566b56d15a55a"  # Model mgmt demo: RAG demo source
+TARGET_DATASET_ID = "69f34f7e471097b6b35983b5"  # Model mgmt demo: RAG demo source
 
 # ============================================================
 # PDF TEST CONFIGURATION
@@ -57,4 +58,23 @@ DOC_CONFIG = {
     'remove_empty_lines': True,
     # Upload settings
     'remote_path': '/chunks',  # Remote directory for uploaded chunks
+}
+
+# ============================================================
+# PPTX TEST CONFIGURATION
+# ============================================================
+
+PPTX_CONFIG = {
+    'name': 'Test-PPTX-Processor',
+    # Extraction settings
+    'extract_images': True,
+    'extract_tables': True,
+    # Chunking Strategy
+    'chunking_strategy': 'recursive',
+    'max_chunk_size': 500,
+    'chunk_overlap': 40,
+    # Text Cleaning
+    'to_correct_spelling': False,
+    # Upload settings
+    'remote_path': '/chunks',
 }
