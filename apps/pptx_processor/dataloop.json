@@ -89,6 +89,17 @@
               "widget": "dl-checkbox"
             },
             {
+              "name": "extract_notes",
+              "title": "Extract Speaker Notes",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": true,
+                "tooltip": "Extract speaker notes from each slide"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
               "name": "to_correct_spelling",
               "title": "Apply Text Cleaning",
               "props": {
@@ -144,7 +155,7 @@
               "title": "Max Chunk Size",
               "props": {
                 "type": "number",
-                "default": 300,
+                "default": 500,
                 "min": 1,
                 "max": 2000,
                 "step": 50,
