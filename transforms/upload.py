@@ -49,11 +49,13 @@ class ChunkUploader:
 
         # Prepare DataFrame with individual metadata for each chunk
         upload_data = []
-        base_name = Path(source_item.name).stem
+        source_path = Path(source_item.name)
+        base_name = source_path.stem
+        file_ext = source_path.suffix.lstrip('.')
         full_remote_path = os.path.join(remote_path, source_item.dir.lstrip('/')).replace('\\', '/')
 
         for idx, chunk_text in enumerate(chunks):
-            chunk_filename = f"{base_name}_chunk_{idx:04d}.txt"
+            chunk_filename = f"{base_name}_{file_ext}_chunk_{idx:04d}.txt"
 
             # Create BytesIO buffer for the chunk
             buffer = io.BytesIO(chunk_text.encode('utf-8'))
