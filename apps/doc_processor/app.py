@@ -56,3 +56,5 @@ class DOCProcessor(dl.BaseServiceRunner):
         except Exception:
             logger.error("Processing failed", exc_info=True)
             raise
+        finally:
+            data.cleanup()
