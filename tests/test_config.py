@@ -9,9 +9,9 @@ Edit the values below to configure your test runs.
 # ============================================================
 # Test items (source dataset is obtained from item.dataset)
 TEST_ITEMS = {
-    'pdf': {'item_id': "69f98494991d96dc8b25b1c9"},
-    'doc': {'item_id': "69f0dd42c56bbd3672dc6767"},
-    'pptx': {'item_id': "69f97c4b694c51b15690db41"}, 
+    'pdf': {'item_id': "69f9966a03bd0ec66d18cbb4"},
+    'doc': {'item_id': "69f9d581551314eff36257b8"},
+    'pptx': {'item_id': "69f97c4b694c51b15690db41"},
 }
 
 # Target dataset where chunks will be uploaded (REQUIRED)
@@ -72,6 +72,7 @@ PPTX_CONFIG = {
     'extract_tables': True,
     'extract_notes': True,
     # OCR Processing
+    'ocr_from_images': True,
     'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
     'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
     # Chunking Strategy
