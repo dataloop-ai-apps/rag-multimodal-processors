@@ -9,9 +9,9 @@ Edit the values below to configure your test runs.
 # ============================================================
 # Test items (source dataset is obtained from item.dataset)
 TEST_ITEMS = {
-    'pdf': {'item_id': "69f0dd3364b5f2de3f19cb5b"},
+    'pdf': {'item_id': "69f98494991d96dc8b25b1c9"},
     'doc': {'item_id': "69f0dd42c56bbd3672dc6767"},
-    'pptx': {'item_id': "69f32d5a700e6fd65d1c6fec"}, 
+    'pptx': {'item_id': "69f97c4b694c51b15690db41"}, 
 }
 
 # Target dataset where chunks will be uploaded (REQUIRED)
@@ -27,7 +27,8 @@ PDF_CONFIG = {
     'extraction_method': 'basic',  # Options: 'markdown', 'basic'
     'extract_images': True,
     # OCR Processing
-    'use_ocr': False,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_from_images': True,
+    'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
     'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
     # Chunking Strategy
     'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed', 'sentence', 'none'
@@ -69,6 +70,10 @@ PPTX_CONFIG = {
     # Extraction settings
     'extract_images': True,
     'extract_tables': True,
+    'extract_notes': True,
+    # OCR Processing
+    'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
     # Chunking Strategy
     'chunking_strategy': 'recursive',
     'max_chunk_size': 500,

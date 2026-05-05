@@ -11,7 +11,6 @@ Handles PowerPoint-specific extraction operations:
 
 import logging
 import os
-import tempfile
 from typing import List, Tuple, Dict, Any
 
 from pptx import Presentation
@@ -37,20 +36,20 @@ class PPTXExtractor:
             return data
 
         try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                file_path = data.item.download(local_path=temp_dir)
-                extract_images = data.config.extract_images
-                extract_tables = data.config.extract_tables
-                extract_notes = data.config.extract_notes
+            temp_dir = data.get_temp_dir()
+            file_path = data.item.download(local_path=temp_dir)
+            extract_images = data.config.extract_images
+            extract_tables = data.config.extract_tables
+            extract_notes = data.config.extract_notes
 
-                content, images, metadata = PPTXExtractor._extract_pptx(
-                    file_path, temp_dir, extract_images, extract_tables, extract_notes
-                )
+            content, images, metadata = PPTXExtractor._extract_pptx(
+                file_path, temp_dir, extract_images, extract_tables, extract_notes
+            )
 
-                data.content_text = content
-                data.images = images
-                metadata['source_file'] = data.item_name
-                data.metadata = metadata
+            data.content_text = content
+            data.images = images
+            metadata['source_file'] = data.item_name
+            data.metadata = metadata
 
         except Exception:
             data.log_error("PPTX extraction failed. Check logs for details.")

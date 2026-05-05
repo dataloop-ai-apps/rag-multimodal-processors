@@ -8,6 +8,7 @@ ExtractedData flows through the entire processing pipeline, carrying:
 - Upload results: uploaded items
 - Error tracking: errors and warnings per stage
 """
+import tempfile
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
@@ -74,6 +75,9 @@ class ExtractedData:
     errors: ErrorTracker = field(default_factory=ErrorTracker)
     current_stage: str = "init"
 
+    # === TEMP DIR (internal) ===
+    _temp_dir_obj: Any = field(default=None, init=False, repr=False)
+
     def __post_init__(self):
         """Initialize error tracker with config settings."""
         # Handle config passed as dict
@@ -83,6 +87,21 @@ class ExtractedData:
         # Sync error tracker with config
         self.errors.error_mode = self.config.error_mode
         self.errors.max_errors = self.config.max_errors
+
+    def get_temp_dir(self) -> str:
+        """Get (or lazily create) a persistent temp directory for this pipeline run."""
+        if self._temp_dir_obj is None:
+            self._temp_dir_obj = tempfile.TemporaryDirectory()
+        return self._temp_dir_obj.name
+
+    def cleanup(self) -> None:
+        """Delete the temp directory. Call this in a finally block after the pipeline completes."""
+        if self._temp_dir_obj is not None:
+            try:
+                self._temp_dir_obj.cleanup()
+            except Exception:
+                pass
+            self._temp_dir_obj = None
 
     def log_error(self, message: str) -> bool:
         """

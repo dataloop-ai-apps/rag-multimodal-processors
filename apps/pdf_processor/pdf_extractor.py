@@ -9,7 +9,6 @@ Handles PDF-specific extraction operations:
 
 import logging
 import os
-import tempfile
 from typing import List, Tuple, Dict, Any
 
 import fitz
@@ -35,20 +34,20 @@ class PDFExtractor:
             return data
 
         try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                file_path = data.item.download(local_path=temp_dir)
-                use_markdown = data.config.use_markdown_extraction
-                extract_images = data.config.extract_images
+            temp_dir = data.get_temp_dir()
+            file_path = data.item.download(local_path=temp_dir)
+            use_markdown = data.config.use_markdown_extraction
+            extract_images = data.config.extract_images
 
-                if use_markdown:
-                    content, images, metadata = PDFExtractor._extract_markdown(file_path, temp_dir, extract_images)
-                else:
-                    content, images, metadata = PDFExtractor._extract_pymupdf(file_path, temp_dir, extract_images)
+            if use_markdown:
+                content, images, metadata = PDFExtractor._extract_markdown(file_path, temp_dir, extract_images)
+            else:
+                content, images, metadata = PDFExtractor._extract_pymupdf(file_path, temp_dir, extract_images)
 
-                data.content_text = content
-                data.images = images
-                metadata['source_file'] = data.item_name
-                data.metadata = metadata
+            data.content_text = content
+            data.images = images
+            metadata['source_file'] = data.item_name
+            data.metadata = metadata
 
         except Exception:
             data.log_error("PDF extraction failed. Check logs for details.")
