@@ -111,6 +111,56 @@
               "widget": "dl-checkbox"
             },
             {
+              "name": "ocr_from_images",
+              "title": "Extract Text from Images (OCR)",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": false,
+                "tooltip": "Extract images from DOCX and apply OCR to extract text from them"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
+              "name": "ocr_integration_method",
+              "title": "OCR Integration Method",
+              "props": {
+                "type": "string",
+                "required": true,
+                "default": "append_to_page",
+                "redAsterisk": true,
+                "tooltip": "How to integrate OCR text with document text",
+                "options": [
+                  {
+                    "value": "append_to_page",
+                    "label": "Append to Page Text"
+                  },
+                  {
+                    "value": "separate_chunks",
+                    "label": "Create Separate Chunks"
+                  },
+                  {
+                    "value": "combine_all",
+                    "label": "Combine All Text"
+                  }
+                ]
+              },
+              "rules": [
+                {
+                  "type": "required",
+                  "effect": "error"
+                }
+              ],
+              "widget": "dl-select",
+              "dependsOn": [
+                {
+                  "field": "ocr_from_images",
+                  "value": true,
+                  "operator": "equals"
+                }
+              ]
+            },
+            {
               "name": "chunking_strategy",
               "title": "Chunking Strategy",
               "props": {
