@@ -10,7 +10,7 @@ Edit the values below to configure your test runs.
 # Test items (source dataset is obtained from item.dataset)
 TEST_ITEMS = {
     'pdf': {'item_id': "69f9966a03bd0ec66d18cbb4"},
-    'doc': {'item_id': "69f9d581551314eff36257b8"},
+    'doc': {'item_id': "69fa2404b890099a0fb22c2d"},
     'pptx': {'item_id': "69f97c4b694c51b15690db41"},
 }
 
@@ -50,6 +50,10 @@ DOC_CONFIG = {
     # Extraction settings
     'extract_images': True,
     'extract_tables': True,
+    # OCR Processing
+    'ocr_from_images': True,
+    'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
     # Chunking Strategy
     'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed', 'sentence', 'none'
     'max_chunk_size': 500,
