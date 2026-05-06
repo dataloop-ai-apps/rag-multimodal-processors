@@ -1,4 +1,4 @@
-FROM hub.dataloop.ai/dtlpy-runner-images/cpu:python3.12_opencv
+FROM hub.dataloop.ai/dtlpy-runner-images/cpu:python3.10_opencv
 # Install Python dependencies
 RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
     pandas>=2.0.0 \
@@ -8,6 +8,6 @@ RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
     langchain-text-splitters>=0.0.1 \
     easyocr>=1.7.0
     
-# docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.4 -f Dockerfile .
-# docker push gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.4
+# docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.5 -f Dockerfile .
+# docker push gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.5
 
