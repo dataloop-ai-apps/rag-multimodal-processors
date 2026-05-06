@@ -8,6 +8,6 @@ RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
     langchain-text-splitters>=0.0.1 \
     easyocr>=1.7.0
     
-# docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.3 -f Dockerfile .
-# docker push gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.3
+# docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.4 -f Dockerfile .
+# docker push gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors/doc-processor:0.0.4
 
