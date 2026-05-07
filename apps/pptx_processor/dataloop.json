@@ -67,28 +67,6 @@
               "widget": "dl-input"
             },
             {
-              "name": "extract_images",
-              "title": "Extract Images",
-              "props": {
-                "type": "boolean",
-                "title": true,
-                "default": true,
-                "tooltip": "Extract images embedded in the PowerPoint slides"
-              },
-              "widget": "dl-checkbox"
-            },
-            {
-              "name": "extract_tables",
-              "title": "Extract Tables",
-              "props": {
-                "type": "boolean",
-                "title": true,
-                "default": true,
-                "tooltip": "Extract tables from slides as formatted text"
-              },
-              "widget": "dl-checkbox"
-            },
-            {
               "name": "extract_notes",
               "title": "Extract Speaker Notes",
               "props": {
