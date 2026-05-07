@@ -35,6 +35,10 @@ def _get_easyocr():
             os.environ['USER'] = 'appuser'
         try:
             import easyocr
+            import torch
+            logging.getLogger("rag-preprocessor").info(
+                f"easyocr loaded (torch {torch.__version__}, easyocr {easyocr.__version__})"
+            )
             _easyocr = easyocr
         except Exception:
             # Remove partially-initialised modules so the next attempt
