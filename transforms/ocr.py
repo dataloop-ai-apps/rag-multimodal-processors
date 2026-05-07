@@ -27,8 +27,21 @@ def _get_easyocr():
     """Lazy import easyocr to avoid loading torch until needed."""
     global _easyocr
     if _easyocr is None:
-        import easyocr
-        _easyocr = easyocr
+        import os
+        import sys
+        # Ensure USER env var is set so getpass.getuser() won't fall back to
+        # pwd.getpwuid(), which fails in containers with unmapped UIDs.
+        if not any(os.environ.get(v) for v in ('LOGNAME', 'USER', 'LNAME', 'USERNAME')):
+            os.environ['USER'] = 'appuser'
+        try:
+            import easyocr
+            _easyocr = easyocr
+        except Exception:
+            # Remove partially-initialised modules so the next attempt
+            # doesn't silently return a broken module object.
+            for mod_name in [k for k in sys.modules if k == 'easyocr' or k.startswith('easyocr.')]:
+                sys.modules.pop(mod_name, None)
+            raise
     return _easyocr
 
 
