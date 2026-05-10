@@ -29,6 +29,7 @@ TEST_ITEMS = {
     'pdf':  {'item_id': 'your-pdf-item-id'},
     'doc':  {'item_id': 'your-docx-item-id'},
     'pptx': {'item_id': 'your-pptx-item-id'},
+    'xlsx':  {'item_id': 'your-xlsx-item-id'},
 }
 
 TARGET_DATASET_ID = 'your-target-dataset-id'
@@ -60,6 +61,7 @@ Run specific processor:
 pytest tests/test_processors.py -k pdf -v
 pytest tests/test_processors.py -k doc -v
 pytest tests/test_processors.py -k pptx -v
+pytest tests/test_processors.py -k xlsx -v
 ```
 
 ## Writing Tests

@@ -7,6 +7,7 @@ Modular, extensible processors for converting **PDF, DOC, and PPTX files** into 
 - **PDF** (.pdf) - ML-enhanced text extraction with PyMuPDF Layout, optional OCR
 - **Microsoft Word** (.docx) - Document processing with tables and images
 - **PowerPoint** (.pptx) - Slide text, speaker notes, tables, and image extraction
+- **Excel** (.xlsx) - Spreadsheet processing with tables and images
 
 ## Key Features
 

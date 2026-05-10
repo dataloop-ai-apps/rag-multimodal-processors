@@ -20,7 +20,9 @@ import dtlpy as dl
 from apps.pdf_processor.app import PDFProcessor
 from apps.doc_processor.app import DOCProcessor
 from apps.pptx_processor.app import PPTXProcessor
-from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, PDF_CONFIG, DOC_CONFIG, PPTX_CONFIG
+from apps.xls_processor.app import XLSProcessor
+
+from tests.test_config import TEST_ITEMS, TARGET_DATASET_ID, PDF_CONFIG, DOC_CONFIG, PPTX_CONFIG, XLS_CONFIG
 
 
 # Processor registry for parameterized tests
@@ -40,6 +42,11 @@ PROCESSORS = {
         'config': PPTX_CONFIG,
         'label': 'PPTX',
     },
+    'xlsx': {
+        'class': XLSProcessor,
+        'config': XLS_CONFIG,
+        'label': 'XLSX',
+    },
 }
 
 
@@ -51,7 +58,7 @@ def _create_mock_context(config: dict) -> dl.Context:
     return context
 
 
-@pytest.mark.parametrize("file_type", ['pdf', 'doc', 'pptx'])
+@pytest.mark.parametrize("file_type", ['pdf', 'doc', 'pptx', 'xlsx'])
 def test_processor(file_type):
     """
     Test processor with a Dataloop item.

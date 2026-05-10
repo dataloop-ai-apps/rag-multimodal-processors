@@ -9,7 +9,6 @@ Handles Excel-specific extraction operations:
 
 import logging
 import os
-import tempfile
 import zipfile
 from typing import List, Dict, Tuple, Optional, Any
 
@@ -38,44 +37,34 @@ class XLSExtractor:
             return data
 
         try:
-            import shutil
-            
-            # Create persistent temp directory for file download for OCR processing
-            temp_dir = tempfile.mkdtemp(prefix='xls_extract_')
-            image_dir = tempfile.mkdtemp(prefix='xls_images_')
+            temp_dir = data.get_temp_dir()
 
-            try:
-                file_path = data.item.download(local_path=temp_dir)
-                use_markdown = data.config.use_markdown_extraction
+            file_path = data.item.download(local_path=temp_dir)
+            use_markdown = data.config.use_markdown_extraction
 
-                # Extract images if configured
-                if data.config.extract_images:
-                    data.images = XLSExtractor._extract_images(file_path, image_dir)
+            # Extract images if configured
+            if data.config.extract_images:
+                data.images = XLSExtractor._extract_images(file_path, temp_dir)
 
-                # Extract tables if configured
-                if data.config.extract_tables:
-                    data.tables = XLSExtractor._extract_tables(file_path)
+            # Extract tables if configured
+            if data.config.extract_tables:
+                data.tables = XLSExtractor._extract_tables(file_path)
 
-                # Extract content based on use_markdown_extraction setting
-                if use_markdown:
-                    data.content_text = XLSExtractor._extract_markdown(file_path, data.tables)
-                else:
-                    data.content_text = XLSExtractor._extract_plain_text(file_path)
+            # Extract content based on use_markdown_extraction setting
+            if use_markdown:
+                data.content_text = XLSExtractor._extract_markdown(file_path, data.tables)
+            else:
+                data.content_text = XLSExtractor._extract_plain_text(file_path)
 
-                # Set metadata
-                data.metadata = {
-                    'source_file': data.item_name,
-                    'extraction_method': 'pandas-openpyxl',
-                    'format': 'markdown' if use_markdown else 'plain',
-                    'image_count': len(data.images),
-                    'table_count': len(data.tables),
-                    'processor': 'xls',
-                }
-            finally:
-                try:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                except OSError:
-                    logger.warning("Failed to clean up temp directory", exc_info=True)
+            # Set metadata
+            data.metadata = {
+                'source_file': data.item_name,
+                'extraction_method': 'pandas-openpyxl',
+                'format': 'markdown' if use_markdown else 'plain',
+                'image_count': len(data.images),
+                'table_count': len(data.tables),
+                'processor': 'xls',
+            }
 
         except Exception:
             data.log_error("Excel extraction failed. Check logs for details.")
