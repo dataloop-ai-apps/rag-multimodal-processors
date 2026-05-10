@@ -13,40 +13,14 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
+import easyocr
+
 from utils.extracted_data import ExtractedData
 from utils.data_types import ImageContent
 
 warnings.filterwarnings(
     'ignore', category=DeprecationWarning, module='torch.ao.quantization', message='.*torch.ao.quantization.*'
 )
-
-_easyocr = None
-
-
-def _get_easyocr():
-    """Lazy import easyocr to avoid loading torch until needed."""
-    global _easyocr
-    if _easyocr is None:
-        import os
-        import sys
-        # Ensure USER env var is set so getpass.getuser() won't fall back to
-        # pwd.getpwuid(), which fails in containers with unmapped UIDs.
-        if not any(os.environ.get(v) for v in ('LOGNAME', 'USER', 'LNAME', 'USERNAME')):
-            os.environ['USER'] = 'appuser'
-        try:
-            import easyocr
-            import torch
-            logging.getLogger("rag-preprocessor").info(
-                f"easyocr loaded (torch {torch.__version__}, easyocr {easyocr.__version__})"
-            )
-            _easyocr = easyocr
-        except Exception:
-            # Remove partially-initialised modules so the next attempt
-            # doesn't silently return a broken module object.
-            for mod_name in [k for k in sys.modules if k == 'easyocr' or k.startswith('easyocr.')]:
-                sys.modules.pop(mod_name, None)
-            raise
-    return _easyocr
 
 
 logger = logging.getLogger("rag-preprocessor")
@@ -186,7 +160,7 @@ class OCREnhancer:
             - If failed: ("", error_message_string)
         """
         try:
-            easyocr = _get_easyocr()
+            # easyocr is imported at module level
             if OCREnhancer._easyocr_reader is None:
                 logger.info(f"Initializing EasyOCR reader with languages: {OCREnhancer._easyocr_languages}")
                 OCREnhancer._easyocr_reader = easyocr.Reader(OCREnhancer._easyocr_languages, gpu=False)

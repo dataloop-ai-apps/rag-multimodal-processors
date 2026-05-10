@@ -1,4 +1,7 @@
 FROM hub.dataloop.ai/dtlpy-runner-images/cpu:python3.12_opencv
+# Create passwd entry for UID 1000 so getpass.getuser() works in the container
+RUN useradd -u 1000 -m appuser
+
 # Install Python dependencies for all processors (doc, pdf, pptx, xls)
 RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
     pandas>=2.0.0 \
