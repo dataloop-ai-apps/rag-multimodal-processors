@@ -23,7 +23,7 @@
         "name": "doc-processor-service",
         "runtime": {
           "podType": "regular-m",
-          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors:0.0.3",
+          "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors:0.0.4",
           "concurrency": 25,
           "autoscaler": {
             "minReplicas": 0,

@@ -1,7 +1,9 @@
 FROM hub.dataloop.ai/dtlpy-runner-images/cpu:python3.12_pytorch2
 
+ENV TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor_cache
+
 RUN ${DL_PYTHON_EXECUTABLE}  -m pip install -U easyocr>=1.7.0 
-RUN python -c "import easyocr"
+RUN ${DL_PYTHON_EXECUTABLE} -c "import easyocr"
 
 # Install Python dependencies for all processors (doc, pdf, pptx, xls)
 RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
@@ -16,5 +18,5 @@ RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
     python-pptx>=0.6.21 \
     openpyxl>=3.1.0
 
-#podman build -t rag-multimodal-processors:0.0.3 -f Dockerfile .
-#podman run -it rag-multimodal-processors:0.0.3
+# docker build --no-cache -t gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors:0.0.4 -f Dockerfile .
+# docker push gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors:0.0.4
