@@ -1,9 +1,10 @@
 FROM hub.dataloop.ai/dtlpy-runner-images/cpu:python3.12_pytorch2
+# FROM hub.dataloop.ai/dtlpy-runner-images/cpu:python3.12_opencv
 
 ENV TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor_cache
 
 RUN ${DL_PYTHON_EXECUTABLE}  -m pip install -U easyocr>=1.7.0 
-RUN ${DL_PYTHON_EXECUTABLE} -c "import easyocr"
+# RUN ${DL_PYTHON_EXECUTABLE} -c "import ssl; ssl._create_default_https_context = ssl._create_unverified_context; import easyocr; easyocr.Reader(['en', 'es', 'fr', 'de', 'it', 'pt'], gpu=False)"
 
 # Install Python dependencies for all processors (doc, pdf, pptx, xls)
 RUN ${DL_PYTHON_EXECUTABLE} -m pip install -U \
