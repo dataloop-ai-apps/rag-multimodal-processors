@@ -100,7 +100,7 @@ class ExtractedData:
             try:
                 self._temp_dir_obj.cleanup()
             except Exception:
-                pass
+                self.log_warning("Failed to cleanup temp directory")
             self._temp_dir_obj = None
 
     def log_error(self, message: str) -> bool:

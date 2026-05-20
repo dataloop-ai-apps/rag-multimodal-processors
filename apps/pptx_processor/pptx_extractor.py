@@ -182,7 +182,7 @@ class PPTXExtractor:
                         path=image_path,
                         page_number=slide_num,
                         format=ext,
-                        size=(shape.width, shape.height),
+                        size=(width, height),
                         bbox=bbox,
                     )
                 )
