@@ -10,7 +10,6 @@ Handles DOCX-specific extraction operations:
 import io
 import logging
 import os
-import tempfile
 from typing import List, Dict, Tuple, Optional
 
 from docx import Document
@@ -35,35 +34,35 @@ class DOCExtractor:
             return data
 
         try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                file_path = data.item.download(local_path=temp_dir)
-                doc = Document(file_path)
+            temp_dir = data.get_temp_dir()
+            file_path = data.item.download(local_path=temp_dir)
+            doc = Document(file_path)
 
-                # Extract images if configured
-                if data.config.extract_images:
-                    data.images = DOCExtractor._extract_images(doc, temp_dir)
+            # Extract images if configured
+            if data.config.extract_images:
+                data.images = DOCExtractor._extract_images(doc, temp_dir)
 
-                # Extract tables if configured
-                if data.config.extract_tables:
-                    data.tables = DOCExtractor._extract_tables(doc)
+            # Extract tables if configured
+            if data.config.extract_tables:
+                data.tables = DOCExtractor._extract_tables(doc)
 
-                # Extract content based on use_markdown_extraction setting
-                use_markdown = data.config.use_markdown_extraction
+            # Extract content based on use_markdown_extraction setting
+            use_markdown = data.config.use_markdown_extraction
 
-                if use_markdown:
-                    data.content_text = DOCExtractor._extract_markdown(doc, data.tables)
-                else:
-                    data.content_text = DOCExtractor._extract_plain_text(doc)
+            if use_markdown:
+                data.content_text = DOCExtractor._extract_markdown(doc, data.tables)
+            else:
+                data.content_text = DOCExtractor._extract_plain_text(doc)
 
-                # Set metadata
-                data.metadata = {
-                    'source_file': data.item_name,
-                    'extraction_method': 'python-docx',
-                    'format': 'markdown' if use_markdown else 'plain',
-                    'image_count': len(data.images),
-                    'table_count': len(data.tables),
-                    'processor': 'doc',
-                }
+            # Set metadata
+            data.metadata = {
+                'source_file': data.item_name,
+                'extraction_method': 'python-docx',
+                'format': 'markdown' if use_markdown else 'plain',
+                'image_count': len(data.images),
+                'table_count': len(data.tables),
+                'processor': 'doc',
+            }
 
         except Exception:
             data.log_error("Document extraction failed. Check logs for details.")

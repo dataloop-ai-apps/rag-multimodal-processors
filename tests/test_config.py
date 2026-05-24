@@ -9,12 +9,14 @@ Edit the values below to configure your test runs.
 # ============================================================
 # Test items (source dataset is obtained from item.dataset)
 TEST_ITEMS = {
-    'pdf': {'item_id': "6911a710d4c1299c6780c14f"},
-    'doc': {'item_id': "6910ba43732d419b5d98b41c"},
+    'pdf': {'item_id': "69f9966a03bd0ec66d18cbb4"},
+    'doc': {'item_id': "69fa2404b890099a0fb22c2d"},
+    'pptx': {'item_id': "69f97c4b694c51b15690db41"},
+    'xlsx': {'item_id': "6a00dc2b9e7c4aa6d639f909"},
 }
 
 # Target dataset where chunks will be uploaded (REQUIRED)
-TARGET_DATASET_ID = "6910ba261a0566b56d15a55a"  # Model mgmt demo: RAG demo source
+TARGET_DATASET_ID = "69f34f7e471097b6b35983b5"  # Model mgmt demo: RAG demo source
 
 # ============================================================
 # PDF TEST CONFIGURATION
@@ -26,7 +28,8 @@ PDF_CONFIG = {
     'extraction_method': 'basic',  # Options: 'markdown', 'basic'
     'extract_images': True,
     # OCR Processing
-    'use_ocr': False,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_from_images': True,
+    'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
     'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
     # Chunking Strategy
     'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed', 'sentence', 'none'
@@ -48,6 +51,10 @@ DOC_CONFIG = {
     # Extraction settings
     'extract_images': True,
     'extract_tables': True,
+    # OCR Processing
+    'ocr_from_images': True,
+    'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
     # Chunking Strategy
     'chunking_strategy': 'recursive',  # Options: 'recursive', 'fixed', 'sentence', 'none'
     'max_chunk_size': 500,
@@ -57,4 +64,52 @@ DOC_CONFIG = {
     'remove_empty_lines': True,
     # Upload settings
     'remote_path': '/chunks',  # Remote directory for uploaded chunks
+}
+
+# ============================================================
+# PPTX TEST CONFIGURATION
+# ============================================================
+
+PPTX_CONFIG = {
+    'name': 'Test-PPTX-Processor',
+    # Extraction settings
+    'extract_images': True,
+    'extract_tables': True,
+    'extract_notes': True,
+    # OCR Processing
+    'ocr_from_images': True,
+    'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
+    # Chunking Strategy
+    'chunking_strategy': 'recursive',
+    'max_chunk_size': 500,
+    'chunk_overlap': 40,
+    # Text Cleaning
+    'to_correct_spelling': False,
+    # Upload settings
+    'remote_path': '/chunks',
+}
+
+# ============================================================
+# PPTX TEST CONFIGURATION
+# ============================================================
+
+XLS_CONFIG = {
+    'name': 'Test-PPTX-Processor',
+    # Extraction settings
+    'extract_images': True,
+    'extract_tables': True,
+    'extract_notes': False,
+    # OCR Processing
+    'ocr_from_images': True,
+    'use_ocr': True,  # Enable OCR on extracted images (uses EasyOCR)
+    'ocr_method': 'local',  # Options: 'local', 'batch', 'auto'
+    # Chunking Strategy
+    'chunking_strategy': 'recursive',
+    'max_chunk_size': 500,
+    'chunk_overlap': 40,
+    # Text Cleaning
+    'to_correct_spelling': False,
+    # Upload settings
+    'remote_path': '/chunks',
 }

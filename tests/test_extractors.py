@@ -1,4 +1,4 @@
-"""Tests for PDF, DOC, and XLS extractors."""
+"""Tests for PDF, DOC, XLS, and PPTX extractors."""
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import os
@@ -10,6 +10,7 @@ from utils.config import Config
 from apps.pdf_processor.pdf_extractor import PDFExtractor
 from apps.doc_processor.doc_extractor import DOCExtractor
 from apps.xls_processor.xls_extractor import XLSExtractor
+from apps.pptx_processor.pptx_extractor import PPTXExtractor
 
 
 class TestPDFExtractorBasics:
@@ -69,7 +70,7 @@ class TestPDFExtractorWithMocks:
 
     def test_extract_basic_pymupdf(self, mock_fitz, mock_item):
         """Should extract text using basic PyMuPDF."""
-        config = Config(extraction_method='basic', extract_images=False)
+        config = Config(use_markdown_extraction=False, extract_images=False)
         data = ExtractedData(item=mock_item, config=config)
 
         result = PDFExtractor.extract(data)
@@ -80,7 +81,7 @@ class TestPDFExtractorWithMocks:
 
     def test_extract_populates_metadata(self, mock_fitz, mock_item):
         """Should populate metadata correctly."""
-        config = Config(extraction_method='basic', extract_images=False)
+        config = Config(use_markdown_extraction=False, extract_images=False)
         data = ExtractedData(item=mock_item, config=config)
 
         result = PDFExtractor.extract(data)
@@ -421,3 +422,132 @@ class TestXLSExtractorIntegration:
 
         assert len(data.errors.errors) > 0
         assert data.current_stage == "extraction"
+
+
+class TestPPTXExtractorBasics:
+    """Test PPTXExtractor basic behavior."""
+
+    def test_extract_without_item_logs_error(self):
+        """Should log error when no item provided."""
+        data = ExtractedData()
+
+        result = PPTXExtractor.extract(data)
+
+        assert len(result.errors.errors) > 0
+        assert "No item provided" in result.errors.errors[0]
+
+    def test_extract_sets_current_stage(self):
+        """Should set current_stage to extraction."""
+        data = ExtractedData()
+
+        PPTXExtractor.extract(data)
+
+        assert data.current_stage == "extraction"
+
+
+class TestPPTXExtractorWithMocks:
+    """Test PPTXExtractor with mocked python-pptx library."""
+
+    @pytest.fixture
+    def mock_presentation(self):
+        """Create mock Presentation with slides, notes, and a table."""
+        with patch('apps.pptx_processor.pptx_extractor.Presentation') as MockPrs:
+            mock_prs = MagicMock()
+
+            # --- Slide 1: text + speaker notes ---
+            slide1 = MagicMock()
+
+            shape1 = MagicMock()
+            shape1.has_text_frame = True
+            shape1.has_table = False
+            shape1.shape_type = 13  # not MSO_SHAPE_TYPE.TABLE or PICTURE
+            para1 = MagicMock()
+            run1 = MagicMock()
+            run1.text = "Slide one title"
+            para1.runs = [run1]
+            shape1.text_frame.paragraphs = [para1]
+
+            slide1.shapes = [shape1]
+            slide1.has_notes_slide = True
+            notes_tf = MagicMock()
+            notes_tf.text = "These are speaker notes"
+            slide1.notes_slide.notes_text_frame = notes_tf
+
+            # --- Slide 2: table ---
+            slide2 = MagicMock()
+
+            table_shape = MagicMock()
+            table_shape.has_text_frame = False
+            table_shape.has_table = True
+            table_shape.shape_type = 19  # TABLE
+            cell_a = MagicMock()
+            cell_a.text = "Header"
+            cell_b = MagicMock()
+            cell_b.text = "Value"
+            row = MagicMock()
+            row.cells = [cell_a, cell_b]
+            table_shape.table.rows = [row]
+
+            slide2.shapes = [table_shape]
+            slide2.has_notes_slide = False
+
+            mock_prs.slides = [slide1, slide2]
+            MockPrs.return_value = mock_prs
+            yield MockPrs
+
+    @pytest.fixture
+    def mock_item(self):
+        """Create mock Dataloop item."""
+        item = Mock()
+        item.name = "test.pptx"
+        item.id = "item-789"
+
+        def mock_download(local_path=None):
+            path = os.path.join(local_path or tempfile.gettempdir(), "test.pptx")
+            with open(path, 'wb') as f:
+                f.write(b'PK fake pptx content')
+            return path
+
+        item.download = mock_download
+        return item
+
+    def test_extract_slide_text(self, mock_presentation, mock_item):
+        """Should extract text from slide shapes."""
+        config = Config(extract_images=False, extract_tables=False)
+        data = ExtractedData(item=mock_item, config=config)
+
+        result = PPTXExtractor.extract(data)
+
+        assert "Slide one title" in result.content_text
+        assert len(result.errors.errors) == 0
+
+    def test_extract_speaker_notes(self, mock_presentation, mock_item):
+        """Should extract speaker notes from slides."""
+        config = Config(extract_images=False, extract_tables=False)
+        data = ExtractedData(item=mock_item, config=config)
+
+        result = PPTXExtractor.extract(data)
+
+        assert "These are speaker notes" in result.content_text
+
+    def test_extract_tables(self, mock_presentation, mock_item):
+        """Should extract table content when extract_tables is True."""
+        config = Config(extract_images=False, extract_tables=True)
+        data = ExtractedData(item=mock_item, config=config)
+
+        result = PPTXExtractor.extract(data)
+
+        assert "Header" in result.content_text
+        assert "Value" in result.content_text
+
+    def test_extract_populates_metadata(self, mock_presentation, mock_item):
+        """Should populate metadata with slide count and processor info."""
+        config = Config(extract_images=False, extract_tables=False)
+        data = ExtractedData(item=mock_item, config=config)
+
+        result = PPTXExtractor.extract(data)
+
+        assert result.metadata.get('source_file') == 'test.pptx'
+        assert result.metadata.get('processor') == 'pptx'
+        assert result.metadata.get('slide_count') == 2
+        assert result.metadata.get('extraction_method') == 'python-pptx'

@@ -1,7 +1,7 @@
 """
-DOC/DOCX processor app.
+PPTX processor app.
 
-DOCX processor that uses DOCExtractor and ExtractedData throughout.
+PPTX processor that uses PPTXExtractor and ExtractedData throughout.
 """
 
 import logging
@@ -13,16 +13,16 @@ import nltk
 import transforms
 from utils.extracted_data import ExtractedData
 from utils.config import Config
-from apps.doc_processor.doc_extractor import DOCExtractor
+from apps.pptx_processor.pptx_extractor import PPTXExtractor
 
 logger = logging.getLogger("rag-preprocessor")
 
 
-class DOCProcessor(dl.BaseServiceRunner):
-    """DOCX processing application."""
+class PPTXProcessor(dl.BaseServiceRunner):
+    """PPTX Processor for extracting text, images, and tables from PowerPoint files and creating chunks."""
 
     def __init__(self):
-        """Initialize DOC processor."""
+        """Initialize PPTX processor."""
         dl.client_api._upload_session_timeout = 60
         dl.client_api._upload_chuck_timeout = 30
 
@@ -34,13 +34,13 @@ class DOCProcessor(dl.BaseServiceRunner):
 
     @staticmethod
     def run(item: dl.Item, target_dataset: dl.Dataset, context: dl.Context) -> List[dl.Item]:
-        """Process a DOCX document into chunks."""
+        """Process a PowerPoint document into chunks."""
         config = context.node.metadata.get('customNodeConfig', {})
         cfg = Config.from_dict(config)
         data = ExtractedData(item=item, target_dataset=target_dataset, config=cfg)
 
         try:
-            data = DOCExtractor.extract(data)
+            data = PPTXExtractor.extract(data)
             if cfg.ocr_from_images:
                 data = transforms.ocr_enhance(data)
             if cfg.to_correct_spelling:

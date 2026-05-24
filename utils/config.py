@@ -34,6 +34,7 @@ class Config:
     use_markdown_extraction: bool = False
     extract_images: bool = True
     extract_tables: bool = True
+    extract_notes: bool = True
 
     # OCR settings
     ocr_from_images: bool = False

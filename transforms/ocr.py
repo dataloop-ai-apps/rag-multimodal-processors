@@ -13,23 +13,14 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
+import easyocr
+
 from utils.extracted_data import ExtractedData
 from utils.data_types import ImageContent
 
 warnings.filterwarnings(
     'ignore', category=DeprecationWarning, module='torch.ao.quantization', message='.*torch.ao.quantization.*'
 )
-
-_easyocr = None
-
-
-def _get_easyocr():
-    """Lazy import easyocr to avoid loading torch until needed."""
-    global _easyocr
-    if _easyocr is None:
-        import easyocr
-        _easyocr = easyocr
-    return _easyocr
 
 
 logger = logging.getLogger("rag-preprocessor")
@@ -169,7 +160,7 @@ class OCREnhancer:
             - If failed: ("", error_message_string)
         """
         try:
-            easyocr = _get_easyocr()
+            # easyocr is imported at module level
             if OCREnhancer._easyocr_reader is None:
                 logger.info(f"Initializing EasyOCR reader with languages: {OCREnhancer._easyocr_languages}")
                 OCREnhancer._easyocr_reader = easyocr.Reader(OCREnhancer._easyocr_languages, gpu=False)

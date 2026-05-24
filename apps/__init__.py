@@ -12,4 +12,6 @@ __all__ = [
     'DOCExtractor',
     'XLSProcessor',
     'XLSExtractor',
+    'PPTXProcessor',
+    'PPTXExtractor',
 ]

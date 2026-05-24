@@ -1,20 +1,16 @@
 {
-  "displayName": "RAG Excel Processor",
-  "name": "rag-xls-processor",
+  "displayName": "RAG PPTX Processor",
+  "name": "rag-pptx-processor",
   "scope": "public",
   "version": "0.1.13",
-  "description": "Excel (XLS/XLSX) processing service that extracts text, tables, images, applies OCR, and creates chunks for RAG pipelines. Supports markdown extraction and multiple chunking strategies.",
+  "description": "PowerPoint processing service that extracts text, images, tables, and speaker notes to create chunks for RAG pipelines.",
   "attributes": {
     "Category": "Application",
     "Provider": "Dataloop",
     "Deployed By": "Dataloop",
     "License": "Apache 2.0",
-    "Application Type": [
-      "Pipeline Node"
-    ],
-    "Media Type": [
-      "Document"
-    ]
+    "Application Type": ["Pipeline Node"],
+    "Media Type": ["Document"]
   },
   "codebase": {
     "type": "git",
@@ -24,7 +20,7 @@
   "components": {
     "computeConfigs": [
       {
-        "name": "xls-processor-service",
+        "name": "pptx-processor-service",
         "runtime": {
           "podType": "regular-m",
           "runnerImage": "gcr.io/viewo-g/piper/agent/runner/apps/rag-multimodal-processors:0.0.4",
@@ -41,12 +37,12 @@
       {
         "invoke": {
           "type": "function",
-          "namespace": "xls-processor-service.xls-processor-module.run"
+          "namespace": "pptx-processor-service.pptx-processor-module.run"
         },
-        "name": "xls-processor-node",
+        "name": "pptx-processor-node",
         "categories": ["document-processing"],
-        "displayName": "Excel to Chunks",
-        "description": "Process Excel (XLS/XLSX) documents to extract text, tables, images, apply OCR, and create chunks",
+        "displayName": "PPTX to Chunks",
+        "description": "Process PowerPoint files to extract text, images, tables, and speaker notes and create chunks",
         "scope": "project",
         "configuration": {
           "fields": [
@@ -56,7 +52,7 @@
               "props": {
                 "title": true,
                 "type": "string",
-                "default": "Excel-to-Chunks",
+                "default": "PPTX-to-Chunks",
                 "required": true,
                 "placeholder": "Insert node name",
                 "redAsterisk": true,
@@ -71,13 +67,24 @@
               "widget": "dl-input"
             },
             {
+              "name": "extract_notes",
+              "title": "Extract Speaker Notes",
+              "props": {
+                "type": "boolean",
+                "title": true,
+                "default": true,
+                "tooltip": "Extract speaker notes from each slide"
+              },
+              "widget": "dl-checkbox"
+            },
+            {
               "name": "to_correct_spelling",
               "title": "Apply Text Cleaning",
               "props": {
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Clean and normalize text to fix formatting inconsistencies"
+                "tooltip": "Clean and normalize text to fix inconsistent formatting"
               },
               "widget": "dl-checkbox"
             },
@@ -88,7 +95,7 @@
                 "type": "boolean",
                 "title": true,
                 "default": false,
-                "tooltip": "Extract images from Excel and apply OCR to extract text from them"
+                "tooltip": "Extract images from DOCX and apply OCR to extract text from them"
               },
               "widget": "dl-checkbox"
             },
@@ -130,17 +137,6 @@
                   "operator": "equals"
                 }
               ]
-            },
-            {
-              "name": "use_markdown_extraction",
-              "title": "Use Markdown Extraction",
-              "props": {
-                "type": "boolean",
-                "title": true,
-                "default": false,
-                "tooltip": "Extract Excel as Markdown for better structure preservation"
-              },
-              "widget": "dl-checkbox"
             },
             {
               "name": "chunking_strategy",
@@ -187,7 +183,7 @@
               "title": "Max Chunk Size",
               "props": {
                 "type": "number",
-                "default": 300,
+                "default": 500,
                 "min": 1,
                 "max": 2000,
                 "step": 50,
@@ -266,10 +262,10 @@
     ],
     "modules": [
       {
-        "name": "xls-processor-module",
-        "computeConfig": "xls-processor-service",
-        "entryPoint": "apps/xls_processor/app.py",
-        "className": "XLSProcessor",
+        "name": "pptx-processor-module",
+        "computeConfig": "pptx-processor-service",
+        "entryPoint": "apps/pptx_processor/app.py",
+        "className": "PPTXProcessor",
         "initInputs": [],
         "functions": [
           {
@@ -290,8 +286,8 @@
                 "name": "items"
               }
             ],
-            "displayIcon": "icon-dl-task",
-            "displayName": "Excel to Chunks"
+            "displayIcon": "icon-dl-presentation",
+            "displayName": "PPTX to Chunks"
           }
         ]
       }
