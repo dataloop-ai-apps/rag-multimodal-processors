@@ -32,7 +32,7 @@ class PPTXExtractor:
         data.current_stage = "extraction"
 
         if not data.item:
-            data.log_error("No item provided for extraction")
+            data.log_error("No item provided for extraction at all")
             return data
 
         try:
